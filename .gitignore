@@ -34,3 +34,6 @@ dist-ssr
 
 .env*
 !.env.example
+
+# Personal data for one-off imports
+/import/

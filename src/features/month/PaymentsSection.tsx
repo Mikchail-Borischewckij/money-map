@@ -14,9 +14,11 @@ export default function PaymentsSection({ plan, readOnly, update, accountName, a
   const [adding, setAdding] = useState(false)
   const change = (id: string, patch: Partial<Payment>) => update((current) => ({ ...current, payments: current.payments.map((payment) => payment.id === id ? { ...payment, ...patch } : payment) }))
   const remove = (id: string) => update((current) => ({ ...current, payments: current.payments.filter((payment) => payment.id !== id) }))
-  const regular = plan.payments.filter((payment) => payment.enabled && payment.recurringPaymentId)
-  const once = plan.payments.filter((payment) => payment.enabled && !payment.recurringPaymentId)
-  const excluded = plan.payments.filter((payment) => !payment.enabled)
+  // By payment date, then name; payments without a date go last.
+  const sorted = [...plan.payments].sort((a, b) => (a.due.slice(0, 10) || '9').localeCompare(b.due.slice(0, 10) || '9') || a.name.localeCompare(b.name, 'ru'))
+  const regular = sorted.filter((payment) => payment.enabled && payment.recurringPaymentId)
+  const once = sorted.filter((payment) => payment.enabled && !payment.recurringPaymentId)
+  const excluded = sorted.filter((payment) => !payment.enabled)
   const row = (payment: Payment) => <PaymentRow key={payment.id} payment={payment} month={plan.month} readOnly={readOnly} accountName={accountName}
     onChange={(patch) => change(payment.id, patch)} onRemove={() => remove(payment.id)} onReset={() => onReset(payment.id)} />
   return <Section step={3} title="Платежи" meta={<span>Всего {money(total([...regular, ...once]))}</span>}
