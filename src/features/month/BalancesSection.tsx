@@ -5,7 +5,7 @@ import { dayLabel, money } from '@/lib/format'
 import { countWeekdaysInPeriod, periodDays } from '@/lib/period'
 import Amount from './Amount'
 import Section from './Section'
-import { kindLabel, periodOfPlan, round, total, type UpdatePlan } from './utils'
+import { periodOfPlan, round, total, type UpdatePlan } from './utils'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -26,14 +26,16 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
   const dateOptions = periodDays(period).map((day) => ({ value: day, label: dayLabel(day) }))
   const change = (id: string, patch: Partial<Account>) => update((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === id ? { ...account, ...patch } : account) }))
   const date = plan.balancesOn ?? dateOptions[0]?.value
-  return <Section step={1} title="Остатки на счетах"
-    meta={accounts.length > 0 && <Badge tone={checked === accounts.length ? 'ok' : 'warn'}>Проверено {checked} из {accounts.length}</Badge>}
+  const done = accounts.length > 0 && checked === accounts.length
+  const sum = total(accounts.map((account) => ({ amount: account.openingBalance })))
+  return <Section step={1} title="Остатки на счетах" done={done}
+    meta={accounts.length > 0 && (done ? <span>{money(sum)}</span> : <Badge tone="warn">Проверено {checked} из {accounts.length}</Badge>)}
     action={readOnly ? date && <span className="section-meta">на {dayLabel(date)}</span>
       : <div className="balances-date"><span>на</span><Select compact label="Остатки на дату" value={date ?? ''} options={dateOptions} onChange={setDate} /></div>}>
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}
     <div className="rows">
       {accounts.map((account) => <div className="row" key={account.id}>
-        <div className="row-main"><strong><AccountBadge name={account.name} hue={accountHue(plan.accounts, account.id)} /></strong><span className="row-meta">{kindLabel[account.kind]}</span></div>
+        <div className="row-main"><strong><AccountBadge name={account.name} hue={accountHue(plan.accounts, account.id)} /></strong></div>
         <div className="row-side">
           {/* A checked balance is locked; uncheck it to correct the amount. */}
           <Amount label={`Остаток: ${account.name}`} value={account.openingBalance} readOnly={readOnly || Boolean(account.balanceConfirmed)} className="amount-locked"
@@ -44,6 +46,6 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
         </div>
       </div>)}
     </div>
-    {accounts.length > 0 && <div className="total-row"><span>Итого</span><strong className="amount">{money(total(accounts.map((account) => ({ amount: account.openingBalance }))))}</strong></div>}
+    {accounts.length > 0 && <div className="total-row"><span>Итого</span><strong className="amount">{money(sum)}</strong></div>}
   </Section>
 }

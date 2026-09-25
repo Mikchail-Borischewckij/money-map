@@ -1,10 +1,11 @@
 import { Check } from 'lucide-react'
-import { Badge, Button, Checkbox, RowMenu, Stepper, TextInput, type MenuItem } from '@/components/ui'
+import { Button, Checkbox, RowMenu, Stepper, TextInput, type MenuItem } from '@/components/ui'
 import { amountToCheck, type Payment } from '@/lib/domain'
 import { money } from '@/lib/format'
 import { countWeekdaysInPeriod, type Period } from '@/lib/period'
 import { weekdayLabel } from '@/lib/schedule'
 import Amount from './Amount'
+import Attention from './Attention'
 import { beforeBalances, dayText, round } from './utils'
 
 export default function PaymentRow({ payment, period, readOnly, accountTag, onChange, onRemove, onReset }: {
@@ -31,16 +32,19 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
 
   // A checked amount is locked; uncheck it to change the amount.
   const locked = readOnly || Boolean(payment.checked)
-  const menu: MenuItem[] = readOnly ? [] : payment.recurringPaymentId
-    ? [{ label: 'Не платить в этом месяце', onSelect: () => onChange({ enabled: false }) }, ...(payment.checked ? [] : [{ label: 'Как в настройках', onSelect: onReset }])]
-    : [{ label: 'Удалить', danger: true, onSelect: onRemove }]
   const calendar = weekly && payment.weekdays ? countWeekdaysInPeriod(period, payment.weekdays) : null
   const setQuantity = (quantity: number) => onChange({ quantity, amount: round(payment.unitPrice! * quantity) })
   const toCheck = amountToCheck(payment) && !payment.checked
   const past = !weekly && beforeBalances(period, payment.due)
+  const menu: MenuItem[] = readOnly ? [] : [
+    ...(past ? [{ label: 'Уже оплачен', onSelect: () => onChange({ enabled: false, exclusionReason: 'Оплачен до даты остатков' }) }] : []),
+    ...(payment.recurringPaymentId
+      ? [{ label: 'Не платить в этом месяце', onSelect: () => onChange({ enabled: false }) }, ...(payment.checked ? [] : [{ label: 'Как в настройках', onSelect: onReset }])]
+      : [{ label: 'Удалить', danger: true, onSelect: onRemove }]),
+  ]
   return <tr>
     <td>
-      <span className="cell-name">{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}{toCheck && <Badge tone="warn">уточните сумму</Badge>}{past && <Badge tone="warn">дата прошла</Badge>}</span>
+      <span className="cell-name">{payment.name}<Attention reasons={[...(toCheck ? ['Сумма — оценка из настроек: впишите точную и отметьте «Проверено»'] : []), ...(past ? ['Дата раньше остатков: возможно, уже оплачен — см. меню'] : [])]} /></span>
       {sub}
     </td>
     <td className="col-opt">{accountTag(payment.accountId)}</td>
@@ -57,8 +61,6 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
       ? payment.checked && <Check size={16} className="checked-mark" aria-label="Проверено" />
       : <Checkbox checked={Boolean(payment.checked)} label={`Проверено: ${payment.name}`} onChange={(checked) => onChange(checked ? { checked, amountPending: false } : { checked })} />}</td>
     <td className="actions"><div className="cell-actions">
-      {!readOnly && toCheck && <Button size="sm" variant="ghost" onClick={() => onChange({ amountPending: false })}>Сумма верна</Button>}
-      {!readOnly && past && <Button size="sm" variant="ghost" onClick={() => onChange({ enabled: false, exclusionReason: 'Оплачен до даты остатков' })}>Уже оплачен</Button>}
       <RowMenu label={`Действия: ${payment.name}`} items={menu} />
     </div></td>
   </tr>

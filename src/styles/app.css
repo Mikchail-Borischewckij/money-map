@@ -57,6 +57,12 @@
 .section-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 0; }
 .section-title h2 { font-size: 18px; letter-spacing: -0.2px; }
 .section-meta { font-size: 13px; color: var(--muted); }
+.section-toggle { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.section-chevron { flex-shrink: 0; color: var(--muted); transition: transform .15s; }
+.section.is-folded .section-chevron { transform: rotate(-90deg); }
+.section.is-folded .section-head { margin-bottom: 0; }
+.step.is-done { background: var(--primary); color: #fff; }
+.attention { display: inline-block; flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--warn); cursor: help; }
 .group { margin-top: 8px; }
 .group-head { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; color: var(--muted); font-variant-numeric: tabular-nums; }
 .group-excluded summary { cursor: pointer; list-style: none; border-top: 1px solid var(--border); padding-top: 14px; }

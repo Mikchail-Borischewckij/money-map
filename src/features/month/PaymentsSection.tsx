@@ -31,7 +31,10 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
     <tr className="group-row"><th colSpan={3}>{title}</th><th className="num">{money(total(items))}</th><th colSpan={2} /></tr>
     {items.map(row)}
   </tbody>
-  return <Section step={3} title="Платежи" meta={<span>Всего {money(total(plan.payments.filter((payment) => payment.enabled)))}</span>}
+  const planned = plan.payments.filter((payment) => payment.enabled)
+  const unchecked = planned.filter((payment) => !payment.checked).length
+  return <Section step={3} title="Платежи" done={planned.length > 0 && unchecked === 0}
+    meta={<span>Всего {money(total(planned))}{unchecked > 0 && ` · не проверено ${unchecked}`}</span>}
     action={!readOnly && <Button size="sm" variant="ghost" icon={<Plus size={16} />} onClick={() => setAdding(true)}>Разовый платёж</Button>}>
     {plan.payments.length === 0 && <Empty>Платежей нет. Регулярные платежи добавляются в настройках.</Empty>}
     {used.length > 1 && <Segmented size="sm" label="Счёт" value={accountId} onChange={setFilter}
