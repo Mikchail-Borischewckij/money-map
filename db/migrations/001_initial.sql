@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE households (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   singleton boolean NOT NULL DEFAULT true UNIQUE CHECK (singleton),
-  name text NOT NULL DEFAULT 'Семья',
+  name text NOT NULL DEFAULT 'Family',
   currency text NOT NULL DEFAULT 'PLN' CHECK (currency = 'PLN'),
   time_zone text NOT NULL DEFAULT 'Europe/Warsaw',
   created_at timestamptz NOT NULL DEFAULT now(),

@@ -1,8 +1,16 @@
 import { readdir, readFile } from 'node:fs/promises'
 import postgres from 'postgres'
 
-const connection = process.env.DATABASE_URL
-if (!connection) throw new Error('DATABASE_URL is required')
+// On Vercel, migrate only production deployments: preview builds must not touch the production database.
+if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
+  console.log(`Skipping database migrations for ${process.env.VERCEL_ENV} deployment`)
+  process.exit(0)
+}
+
+// Vercel builds have no IPv6, so the Supabase direct connection is unreachable there.
+// MIGRATION_DATABASE_URL should be the Session pooler string; the Transaction pooler is not suitable for DDL.
+const connection = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
+if (!connection) throw new Error('MIGRATION_DATABASE_URL or DATABASE_URL is required')
 
 const sql = postgres(connection, {
   ssl: process.env.DATABASE_SSL === 'disable' ? false : 'require',
@@ -15,6 +23,8 @@ const directory = new URL('../db/migrations/', import.meta.url)
 try {
   const files = (await readdir(directory)).filter((file) => file.endsWith('.sql')).sort()
   await sql.begin(async (transaction) => {
+    // Serialize concurrent deployments; the lock is released when the transaction ends.
+    await transaction`SELECT pg_advisory_xact_lock(hashtext('money-map-migrations'))`
     await transaction.unsafe('CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
     for (const file of files) {
       const name = file.replace(/\.sql$/, '')

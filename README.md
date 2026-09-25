@@ -33,9 +33,9 @@ Google OAuth-клиент должен иметь Redirect URI `http://localhost
 ## Размещение на Vercel и Supabase
 
 1. Создайте отдельный проект Supabase PostgreSQL для MoneyMap. Схема в `db/migrations/001_initial.sql` закрывает таблицы от ролей `anon` и `authenticated`; браузер не использует ключ Supabase для финансовых данных.
-2. Примените миграцию, используя прямое подключение Supabase к PostgreSQL. Для миграций не используйте transaction pooler. Если прямое подключение недоступно из вашей сети, выполните SQL из миграции в SQL Editor Supabase.
+2. Миграции из `db/migrations` применяются автоматически при каждом production-деплое: Vercel запускает скрипт `vercel-build`, то есть `npm run db:migrate`, а затем `next build`. Preview-сборки миграции пропускают. Если миграция не прошла, деплой останавливается.
 3. Подключите этот репозиторий к Vercel как Next.js-проект. Статические страницы и серверное `/api` будут на одном домене.
-4. В Vercel Environment Variables задайте `DATABASE_URL` (строка Transaction pooler для serverless-запросов), `DATABASE_SSL=require`, `APP_ORIGIN` (точный production-адрес), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_GOOGLE_EMAIL_1`. `ALLOWED_GOOGLE_EMAIL_2` пока необязателен.
+4. В Vercel Environment Variables задайте `DATABASE_URL` (строка Transaction pooler для serverless-запросов), `DATABASE_SSL=require`, `APP_ORIGIN` (точный production-адрес), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_GOOGLE_EMAIL_1`. `ALLOWED_GOOGLE_EMAIL_2` пока необязателен. Для миграций задайте только в Production `MIGRATION_DATABASE_URL` — строку Session pooler Supabase: сборка Vercel не поддерживает IPv6, поэтому прямое подключение ей недоступно, а Transaction pooler не подходит для DDL.
 5. Добавьте production Redirect URI `https://ВАШ-ДОМЕН/api/auth/callback` в Google OAuth-клиент и выполните deployment.
 
 При первом входе подтверждённый Gmail или Google Workspace адрес из списка однократно привязывается к Google `sub`. Для внешних адресов без подтверждённого Google-домена автоматическая привязка запрещена. После привязки другой `sub` с тем же email не получает доступ. Удаление адреса из серверного списка отзывает доступ связанного пользователя на следующем запросе. Для отзыва конкретной сессии можно установить `revoked_at` в таблице `sessions` или воспользоваться кнопкой выхода.

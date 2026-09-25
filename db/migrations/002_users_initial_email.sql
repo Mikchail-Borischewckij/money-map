@@ -1,5 +1,5 @@
--- Базы, созданные по ранней версии 001_initial, не содержат users.initial_email.
--- Миграция безопасна для новых баз: все шаги пропускаются, если колонка и ограничения уже есть.
+-- Databases created from an early version of 001_initial lack users.initial_email.
+-- Safe for new databases: every step is skipped when the column and constraints already exist.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS initial_email text;
 UPDATE users SET initial_email = lower(email) WHERE initial_email IS NULL;
 ALTER TABLE users ALTER COLUMN initial_email SET NOT NULL;
