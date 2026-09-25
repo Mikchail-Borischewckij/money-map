@@ -13,11 +13,12 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
   const liveAccounts = plan.accounts.filter((account) => !account.isArchived)
   const unchecked = liveAccounts.filter((account) => !account.balanceConfirmed).length
   const incomesToCheck = plan.incomes.filter(amountToCheck).length
-  const paymentsToCheck = plan.payments.filter(amountToCheck).length
+  // Every payment still planned must be checked before the month can be closed.
+  const paymentsToCheck = plan.payments.filter((payment) => payment.enabled && !payment.checked).length
   const closeBlocker = liveAccounts.length === 0 ? 'Добавьте счёт в настройках.'
     : unchecked > 0 ? `Проверьте остатки: осталось ${unchecked}.`
     : incomesToCheck > 0 ? `Уточните суммы доходов: осталось ${incomesToCheck}.`
-    : paymentsToCheck > 0 ? `Уточните суммы платежей: осталось ${paymentsToCheck}.`
+    : paymentsToCheck > 0 ? `Проверьте платежи: осталось ${paymentsToCheck}.`
     : month.dirty || month.saveState === 'saving' ? 'Сохраняем изменения…' : ''
   const saveText = month.saveState === 'conflict' ? 'Конфликт' : month.saveState === 'error' ? 'Не сохранено' : month.saveState === 'saving' || month.dirty ? 'Сохраняем…' : 'Сохранено'
   const actions = { onResetPayment: (id: string) => void month.reset('payments', id), onResetIncome: (id: string) => void month.reset('incomes', id), onOpenSettings }

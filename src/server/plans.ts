@@ -291,6 +291,7 @@ export async function changePlanStatus(session: Session, id: string, action: 'fi
         EXISTS (SELECT 1 FROM account_balances WHERE monthly_plan_id = ${id} AND is_confirmed = false)
         OR EXISTS (SELECT 1 FROM accounts a LEFT JOIN account_balances b ON b.account_id = a.id AND b.monthly_plan_id = ${id}
           WHERE a.household_id = ${session.householdId} AND a.is_archived = false AND b.account_id IS NULL)
+        OR EXISTS (SELECT 1 FROM monthly_payments WHERE monthly_plan_id = ${id} AND is_enabled AND NOT is_checked)
       ) AS missing, (SELECT COUNT(*) FROM account_balances WHERE monthly_plan_id = ${id}) AS account_count`
       if (incomplete[0].missing || Number(incomplete[0].account_count) === 0) return 'incomplete'
       await tx`UPDATE account_balances b SET name_snapshot = a.name, type_snapshot = a.type,

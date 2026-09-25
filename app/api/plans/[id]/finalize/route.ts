@@ -12,5 +12,5 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const parsed = z.object({ expectedVersion: z.number().int().positive() }).safeParse(await request.json().catch(() => null))
   if (!parsed.success) return Response.json({ error: 'Invalid version' }, { status: 400, headers: privateHeaders })
   const result = await changePlanStatus(session, id, 'finalize', parsed.data.expectedVersion)
-  return Response.json(result.result === 'incomplete' ? { error: 'Confirm opening balances before finalizing' } : result.current ?? { error: 'Not found' }, { status: result.result === 'saved' ? 200 : result.result === 'missing' ? 404 : result.result === 'incomplete' ? 422 : 409, headers: privateHeaders })
+  return Response.json(result.result === 'incomplete' ? { error: 'Check opening balances and payments before finalizing' } : result.current ?? { error: 'Not found' }, { status: result.result === 'saved' ? 200 : result.result === 'missing' ? 404 : result.result === 'incomplete' ? 422 : 409, headers: privateHeaders })
 }
