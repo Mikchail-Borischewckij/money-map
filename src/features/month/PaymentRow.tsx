@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { Button, Checkbox, RowMenu, Stepper, TextInput, type MenuItem } from '@/components/ui'
+import { Button, Checkbox, RowMenu, Stepper, type MenuItem } from '@/components/ui'
 import { amountToCheck, type Payment } from '@/lib/domain'
 import { money } from '@/lib/format'
 import { countWeekdaysInPeriod, type Period } from '@/lib/period'
@@ -19,15 +19,12 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
   const sub = <div className="cell-sub">{accountTag(payment.accountId)}{details && <span>{details}</span>}</div>
 
   if (!payment.enabled) return <tr className="is-muted">
-    <td><span className="cell-name">{payment.name}</span>{sub}
-      {readOnly ? payment.exclusionReason && <div className="row-meta">{payment.exclusionReason}</div>
-        : <TextInput label={`Причина: ${payment.name}`} placeholder="Причина (необязательно)" value={payment.exclusionReason ?? ''} onChange={(exclusionReason) => onChange({ exclusionReason })} />}
-    </td>
+    <td><span className="cell-name">{payment.name}</span>{sub}</td>
     <td className="col-opt">{accountTag(payment.accountId)}</td>
     <td className="col-opt muted">{details}</td>
     <td className="num">{money(payment.amount)}</td>
     <td className="col-check" />
-    <td className="actions">{!readOnly && <Button size="sm" onClick={() => onChange({ enabled: true, exclusionReason: '' })}>Вернуть</Button>}</td>
+    <td className="actions">{!readOnly && <Button size="sm" onClick={() => onChange({ enabled: true })}>Вернуть</Button>}</td>
   </tr>
 
   // A checked amount is locked; uncheck it to change the amount.
@@ -37,7 +34,7 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
   const toCheck = amountToCheck(payment) && !payment.checked
   const past = !weekly && beforeBalances(period, payment.due)
   const menu: MenuItem[] = readOnly ? [] : [
-    ...(past ? [{ label: 'Уже оплачен', onSelect: () => onChange({ enabled: false, exclusionReason: 'Оплачен до даты остатков' }) }] : []),
+    ...(past ? [{ label: 'Уже оплачен', onSelect: () => onChange({ enabled: false }) }] : []),
     ...(payment.recurringPaymentId
       ? [{ label: 'Не платить в этом месяце', onSelect: () => onChange({ enabled: false }) }, ...(payment.checked ? [] : [{ label: 'Как в настройках', onSelect: onReset }])]
       : [{ label: 'Удалить', danger: true, onSelect: onRemove }]),
