@@ -6,11 +6,11 @@ import Section from './Section'
 const signed = (value: number) => value === 0 ? '—' : `${value > 0 ? '+' : '−'} ${amount(Math.abs(value))}`
 
 // Per account: what it has, what leaves it, the transfers in or out and what stays; then the transfers to make, in order.
-export default function TransfersSection({ summary, accountName }: { summary: PlanSummary; accountName: (id: string) => string }) {
+export default function TransfersSection({ step, summary, accountName }: { step: number; summary: PlanSummary; accountName: (id: string) => string }) {
   const accounts = summary.accounts.filter((account) => !account.isArchived || account.available || account.needed || account.incoming || account.outgoing)
   if (accounts.length === 0) return null
   const sum = (pick: (account: typeof accounts[number]) => number) => accounts.reduce((total, account) => total + pick(account), 0)
-  return <Section step={5} title="Счета и переводы" id="transfers" meta={<span>в zł</span>}>
+  return <Section step={step} title="Счета и переводы" id="transfers" meta={<span>в zł</span>}>
     <div className="table-scroll">
       <table className="money-table">
         <thead><tr><th>Счёт</th><th>Есть и придёт</th><th>Уйдёт</th><th>Перевод</th><th>Останется</th></tr></thead>
