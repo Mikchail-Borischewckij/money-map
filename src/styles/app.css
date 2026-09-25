@@ -240,6 +240,14 @@
 .data-table .actions { width: 1%; text-align: right; white-space: nowrap; }
 .cell-name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-weight: 600; }
 .cell-sub { display: none; }
+.data-table .group-row th { padding: 14px 10px 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; color: var(--muted); text-align: left; }
+.data-table .group-row th:first-child { padding-left: 0; }
+.data-table .group-row th.num { text-align: right; }
+.data-table tfoot th { border-top: 2px solid var(--border-strong); text-align: left; font-weight: 700; }
+.data-table tfoot th.num { text-align: right; }
+.data-table td .text-input { height: 34px; font-size: 13px; margin-top: 6px; max-width: 320px; }
+.payments-table .units-cell { justify-content: flex-end; }
+.section > .segmented { margin-top: 4px; }
 .cell-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .cell-flow { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
 .cell-flow svg { color: var(--muted); }
