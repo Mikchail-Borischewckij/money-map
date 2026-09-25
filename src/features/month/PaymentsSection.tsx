@@ -16,19 +16,19 @@ const ALL = 'all'
 export default function PaymentsSection({ plan, readOnly, update, accountTag, accounts, categories, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountTag: (id: string) => React.ReactNode; accounts: Account[]; categories: string[]; onReset: (id: string) => void }) {
   const [adding, setAdding] = useState(false)
   const [filter, setFilter] = useState(ALL)
-  const [showExcluded, setShowExcluded] = useState(false)
   const change = (id: string, patch: Partial<Payment>) => update((current) => ({ ...current, payments: current.payments.map((payment) => payment.id === id ? { ...payment, ...patch } : payment) }))
   const remove = (id: string) => update((current) => ({ ...current, payments: current.payments.filter((payment) => payment.id !== id) }))
   const used = plan.accounts.filter((account) => plan.payments.some((payment) => payment.accountId === account.id))
   const accountId = used.some((account) => account.id === filter) ? filter : ALL
   const shown = plan.payments.filter((payment) => accountId === ALL || payment.accountId === accountId)
-  const regular = shown.filter((payment) => payment.enabled && payment.recurringPaymentId)
-  const once = shown.filter((payment) => payment.enabled && !payment.recurringPaymentId)
-  const excluded = shown.filter((payment) => !payment.enabled)
+  // Payments skipped this month stay in place, struck through, and are left out of the totals.
+  const regular = shown.filter((payment) => payment.recurringPaymentId)
+  const once = shown.filter((payment) => !payment.recurringPaymentId)
+  const sum = (items: Payment[]) => total(items.filter((payment) => payment.enabled))
   const row = (payment: Payment) => <PaymentRow key={payment.id} payment={payment} period={periodOfPlan(plan)} readOnly={readOnly} accountTag={accountTag}
     onChange={(patch) => change(payment.id, patch)} onRemove={() => remove(payment.id)} onReset={() => onReset(payment.id)} />
   const group = (title: string, items: Payment[]) => items.length > 0 && <tbody>
-    <tr className="group-row"><th colSpan={3}>{title}</th><th className="num">{money(total(items))}</th><th colSpan={2} /></tr>
+    <tr className="group-row"><th colSpan={3}>{title}</th><th className="num">{money(sum(items))}</th><th colSpan={2} /></tr>
     {items.map(row)}
   </tbody>
   const planned = plan.payments.filter((payment) => payment.enabled)
@@ -44,12 +44,8 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
       {group('Регулярные', regular)}
       {group('Разовые', once)}
       {regular.length + once.length === 0 && <tbody><tr><td colSpan={6} className="muted">Платежей с этого счёта нет.</td></tr></tbody>}
-      <tfoot><tr><th colSpan={3}>{accountId === ALL ? 'Итого' : 'Итого по счёту'}</th><th className="num">{money(total([...regular, ...once]))}</th><th colSpan={2} /></tr></tfoot>
+      <tfoot><tr><th colSpan={3}>{accountId === ALL ? 'Итого' : 'Итого по счёту'}</th><th className="num">{money(sum(shown))}</th><th colSpan={2} /></tr></tfoot>
     </table></div>}
-    {excluded.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowExcluded(!showExcluded)}>
-      {showExcluded ? 'Скрыть неоплачиваемые' : `Не платим в этом месяце · ${excluded.length} · ${money(total(excluded))}`}
-    </button>}
-    {showExcluded && excluded.length > 0 && <div className="table-scroll"><table className="data-table payments-table"><tbody>{excluded.map(row)}</tbody></table></div>}
     {adding && <OneOffDialog kind="payment" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
       onSave={({ name, amount, accountId, day, category }) => {
         update((current) => ({ ...current, payments: [...current.payments, { id: crypto.randomUUID(), name, amount, accountId, category, enabled: true, due: day ? dayInPlan(current, day) : 'в течение месяца' }] }))
