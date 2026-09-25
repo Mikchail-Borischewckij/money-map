@@ -17,7 +17,7 @@ const income = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
   expectedOn: z.union([z.iso.date(), z.literal('')]), enabled: z.boolean(),
   status: z.enum(['expected', 'included', 'excluded']),
-  recurringIncomeId: uuid.nullable().optional(),
+  recurringIncomeId: uuid.nullable().optional(), amountPending: z.boolean().optional(),
 })
 const payment = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
@@ -52,5 +52,5 @@ export const templateInput = z.object({
   day: z.number().int().min(1).max(31).nullable(),
   categoryId: uuid.nullable().optional(), version: z.number().int().positive().optional(),
   schedule: z.enum(['monthly', 'weekly']).default('monthly'), weekdays: weekdays.nullable().default(null),
-  ended: z.boolean().default(false),
+  ended: z.boolean().default(false), amountVaries: z.boolean().default(false),
 }).refine((value) => value.schedule === 'weekly' ? value.weekdays !== null && value.day === null : value.weekdays === null, { message: 'Weekly schedule needs weekdays and no day' })

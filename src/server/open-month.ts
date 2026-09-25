@@ -20,12 +20,12 @@ export async function lockOpenPlan(tx: Sql, householdId: string): Promise<OpenPl
 export async function templateAt(tx: Sql, kind: Kind, id: string, plan: OpenPlan): Promise<PaymentTemplate | IncomeTemplate | null> {
   const first = `${monthText(plan)}-01`
   if (kind === 'income') {
-    const rows = await tx`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day
+    const rows = await tx`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day, i.amount_varies
       FROM recurring_incomes i JOIN income_template_versions v ON v.recurring_income_id = i.id JOIN accounts a ON a.id = v.account_id
       WHERE i.id = ${id} AND i.is_archived = false AND a.is_archived = false
       AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
       AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
-    return rows[0] ? { id: rows[0].id, name: rows[0].name, accountId: rows[0].account_id, amount: Number(rows[0].default_amount), day: rows[0].expected_day } : null
+    return rows[0] ? { id: rows[0].id, name: rows[0].name, accountId: rows[0].account_id, amount: Number(rows[0].default_amount), day: rows[0].expected_day, varies: rows[0].amount_varies } : null
   }
   const rows = await tx`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, COALESCE(c.name, '') AS category
     FROM recurring_payments p JOIN payment_template_versions v ON v.recurring_payment_id = p.id JOIN accounts a ON a.id = v.account_id
@@ -44,9 +44,9 @@ async function paymentRow(tx: Sql, planId: string, templateId: string): Promise<
 }
 
 async function incomeRow(tx: Sql, planId: string, templateId: string): Promise<MoneyIncome | null> {
-  const rows = await tx`SELECT id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status FROM monthly_incomes WHERE monthly_plan_id = ${planId} AND recurring_income_id = ${templateId} LIMIT 1`
+  const rows = await tx`SELECT id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${planId} AND recurring_income_id = ${templateId} LIMIT 1`
   const row = rows[0]
-  return row ? { id: row.id, recurringIncomeId: templateId, name: row.name_snapshot, amount: Number(row.amount), accountId: row.account_id, expectedOn: row.expected_date ?? '', enabled: row.is_enabled, status: row.status === 'Expected' ? 'expected' : row.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded' } : null
+  return row ? { id: row.id, recurringIncomeId: templateId, name: row.name_snapshot, amount: Number(row.amount), accountId: row.account_id, expectedOn: row.expected_date ?? '', enabled: row.is_enabled, status: row.status === 'Expected' ? 'expected' : row.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: row.amount_pending } : null
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
@@ -82,11 +82,11 @@ export async function applyToOpenMonth(tx: Sql, session: Session, kind: Kind, id
     kept = merge.kept
     const value = merge.value
     if (!row) {
-      await tx`INSERT INTO monthly_incomes (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version)
-        VALUES (${value.id}, ${plan.id}, ${id}, ${value.name}, ${value.amount}, ${value.accountId}, ${value.expectedOn || null}, true, 'Expected', ${version})`
+      await tx`INSERT INTO monthly_incomes (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version, amount_pending)
+        VALUES (${value.id}, ${plan.id}, ${id}, ${value.name}, ${value.amount}, ${value.accountId}, ${value.expectedOn || null}, true, 'Expected', ${version}, ${Boolean(value.amountPending)})`
       changed = true
     } else if (!same(row, value)) {
-      await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, amount = ${value.amount}, account_id = ${value.accountId}, expected_date = ${value.expectedOn || null}, version = ${version} WHERE id = ${row.id}`
+      await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, amount = ${value.amount}, account_id = ${value.accountId}, expected_date = ${value.expectedOn || null}, amount_pending = ${Boolean(value.amountPending)}, version = ${version} WHERE id = ${row.id}`
       changed = true
     }
   }

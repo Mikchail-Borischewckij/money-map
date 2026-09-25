@@ -5,7 +5,7 @@ import { mergeIncome, mergePayment, paymentFromTemplate, type IncomeTemplate, ty
 const month = '2026-10'
 const rent: PaymentTemplate = { id: 'rent', name: 'Аренда', category: 'Жильё', accountId: 'main', amount: 350000, day: 10, schedule: 'monthly', weekdays: null }
 const pool: PaymentTemplate = { id: 'pool', name: 'Бассейн', category: 'Спорт', accountId: 'main', amount: 7000, day: null, schedule: 'weekly', weekdays: [1, 4] }
-const salary: IncomeTemplate = { id: 'salary', name: 'Зарплата', accountId: 'main', amount: 900000, day: 10 }
+const salary: IncomeTemplate = { id: 'salary', name: 'Зарплата', accountId: 'main', amount: 900000, day: 10, varies: false }
 const salaryRow: MoneyIncome = { id: 'i1', recurringIncomeId: 'salary', name: 'Зарплата', amount: 900000, accountId: 'main', expectedOn: '2026-10-10', enabled: true, status: 'expected' }
 
 describe('settings changes in the open month', () => {
@@ -58,5 +58,23 @@ describe('settings changes in the open month', () => {
     const { value, kept } = mergeIncome(month, { ...salaryRow, status: 'included', amount: 950000 }, salary, { ...salary, amount: 1000000, day: 31 })
     expect(value).toMatchObject({ amount: 950000, expectedOn: '2026-10-31', status: 'included' })
     expect(kept).toEqual(['сумма'])
+  })
+
+  it('marks a varying income as an estimate in a new month', () => {
+    const { value } = mergeIncome(month, null, null, { ...salary, varies: true }, () => 'i2')
+    expect(value).toMatchObject({ id: 'i2', amount: 900000, amountPending: true })
+  })
+
+  it('marks the open month when settings start saying the amount varies, unless the amount was set in the month', () => {
+    expect(mergeIncome(month, salaryRow, salary, { ...salary, varies: true }).value.amountPending).toBe(true)
+    expect(mergeIncome(month, { ...salaryRow, amount: 950000 }, salary, { ...salary, varies: true }).value.amountPending).toBe(false)
+    expect(mergeIncome(month, { ...salaryRow, status: 'included' }, salary, { ...salary, varies: true }).value.amountPending).toBe(false)
+  })
+
+  it('keeps a checked amount checked and drops the mark when the amount no longer varies', () => {
+    const varying = { ...salary, varies: true }
+    expect(mergeIncome(month, { ...salaryRow, amountPending: false }, varying, { ...varying, day: 12 }).value.amountPending).toBe(false)
+    expect(mergeIncome(month, { ...salaryRow, amountPending: true }, varying, { ...varying, amount: 800000 }).value).toMatchObject({ amount: 800000, amountPending: true })
+    expect(mergeIncome(month, { ...salaryRow, amountPending: true }, varying, salary).value.amountPending).toBe(false)
   })
 })

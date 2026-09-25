@@ -22,6 +22,8 @@ export type Income = {
   enabled: boolean
   status: 'expected' | 'included' | 'excluded'
   recurringIncomeId?: string | null
+  // Set while the amount is still the estimate from settings for an income whose amount changes monthly.
+  amountPending?: boolean
 }
 
 export type Payment = {
@@ -86,6 +88,9 @@ export type PlanSummary = {
   freeAfterPlan: number
   uncovered: number
 }
+
+// A regular income with a changing amount still carries the settings estimate until someone checks it.
+export const amountToCheck = (income: Income) => Boolean(income.amountPending) && income.enabled && income.status === 'expected'
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
 
@@ -160,7 +165,7 @@ export function calculatePlan(plan: Plan): PlanSummary {
   return {
     accounts: summaries,
     transfers,
-    isPreliminary: plan.accounts.length === 0 || plan.accounts.some((account) => !account.balanceConfirmed),
+    isPreliminary: plan.accounts.length === 0 || plan.accounts.some((account) => !account.balanceConfirmed) || plan.incomes.some(amountToCheck),
     totalAvailable,
     totalIncome,
     totalPayments,

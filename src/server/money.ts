@@ -1,5 +1,5 @@
 export type MoneyAccount = { id: string; name: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean }
-export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null }
+export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean }
 export type MoneyPayment = { id: string; name: string; amount: number; accountId: string; due: string; enabled: boolean; category: string; recurringPaymentId?: string | null; schedule?: 'monthly' | 'weekly' | null; weekdays?: number[] | null; unitPrice?: number | null; quantity?: number | null; exclusionReason?: string }
 export type MoneyAllocation = { id: string; name: string; amount: number; accountId: string; kind: 'living' | 'savings' | 'other' }
 export type MoneyPlan = { month: string; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[] }
@@ -12,6 +12,9 @@ const safeNumber = (value: bigint) => {
   if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) throw new Error('Money total is too large')
   return Number(value)
 }
+
+// A regular income with a changing amount still carries the settings estimate until someone checks it.
+export const amountToCheck = (income: MoneyIncome) => Boolean(income.amountPending) && income.enabled && income.status === 'expected'
 
 export function calculateMoneyPlan(plan: MoneyPlan) {
   const accounts = plan.accounts.map((account) => {
@@ -45,7 +48,7 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
   const totalAvailable = total(accounts.map((account) => account.available))
   return {
     accounts, transfers,
-    isPreliminary: accounts.length === 0 || accounts.some((account) => !account.balanceConfirmed),
+    isPreliminary: accounts.length === 0 || accounts.some((account) => !account.balanceConfirmed) || plan.incomes.some(amountToCheck),
     totalAvailable: safeNumber(totalAvailable), totalIncome: safeNumber(totalIncome),
     totalPayments: safeNumber(totalPayments), totalLiving: safeNumber(totalLiving),
     totalSavings: safeNumber(totalSavings), totalOther: safeNumber(totalOther),

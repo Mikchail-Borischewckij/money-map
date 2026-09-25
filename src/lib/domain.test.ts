@@ -21,6 +21,16 @@ describe('calculatePlan', () => {
     expect(summary.freeAfterPlan).toBe(1000)
   })
 
+  it('stays preliminary while a changing income amount is not checked', () => {
+    const plan = structuredClone(demoPlan)
+    plan.accounts.forEach((account) => { account.balanceConfirmed = true })
+    expect(calculatePlan(plan).isPreliminary).toBe(false)
+    plan.incomes[0].amountPending = true
+    expect(calculatePlan(plan).isPreliminary).toBe(true)
+    plan.incomes[0].status = 'included'
+    expect(calculatePlan(plan).isPreliminary).toBe(false)
+  })
+
   it('reports an uncovered gap when approved sources cannot fund it', () => {
     const plan = structuredClone(demoPlan)
     plan.accounts[0].openingBalance = 0

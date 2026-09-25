@@ -95,3 +95,21 @@ it('removes old months, keeps one open month per household and adds starter cate
     await pg.close()
   }
 })
+
+it('adds the changing-amount mark to existing incomes as off', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    for (const file of ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql', '004_single_open_month.sql']) {
+      await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    }
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    const account = (await pg.query<{ id: string }>("INSERT INTO accounts (household_id, name, type) VALUES ($1, 'Счёт', 'current') RETURNING id", [household])).rows[0].id
+    await pg.query("INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, active_from) VALUES ($1, 'Зарплата', 100, $2, '2026-09-01')", [household, account])
+    await pg.exec(await readFile(new URL('./migrations/005_income_amount_varies.sql', import.meta.url), 'utf8'))
+    expect((await pg.query<{ amount_varies: boolean }>('SELECT amount_varies FROM recurring_incomes')).rows).toEqual([{ amount_varies: false }])
+    const columns = await pg.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'monthly_incomes' AND column_name = 'amount_pending'")
+    expect(columns.rows).toHaveLength(1)
+  } finally {
+    await pg.close()
+  }
+})

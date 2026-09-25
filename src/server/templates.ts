@@ -16,6 +16,7 @@ export type TemplateValue = {
   version?: number
   schedule?: 'monthly' | 'weekly'
   weekdays?: number[] | null
+  amountVaries?: boolean
 }
 
 const firstOf = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}-01`
@@ -37,7 +38,7 @@ export async function settingsWindow(session: Session) {
 }
 
 export async function listTemplates(session: Session, kind: TemplateKind) {
-  if (kind === 'income') return db()`SELECT i.id, i.name, i.default_amount, i.account_id, i.expected_day AS day,
+  if (kind === 'income') return db()`SELECT i.id, i.name, i.default_amount, i.account_id, i.expected_day AS day, i.amount_varies,
     i.active_from::text, i.active_to::text, i.is_archived, i.version, v.effective_from::text AS latest_effective_from
     FROM recurring_incomes i JOIN LATERAL (SELECT effective_from FROM income_template_versions
       WHERE recurring_income_id = i.id ORDER BY effective_from DESC LIMIT 1) v ON true
@@ -68,8 +69,8 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
     const tx = transaction as unknown as Sql
     const plan = await lockOpenPlan(tx, session.householdId)
     if (kind === 'income') {
-      const rows = await tx`INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, expected_day, active_from, active_to)
-        VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.activeFrom}, ${value.activeTo}) RETURNING *`
+      const rows = await tx`INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, expected_day, active_from, active_to, amount_varies)
+        VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.activeFrom}, ${value.activeTo}, ${value.amountVaries ?? false}) RETURNING *`
       await tx`INSERT INTO income_template_versions (recurring_income_id, effective_from, name, default_amount, account_id, expected_day)
         VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
       await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
@@ -119,7 +120,7 @@ export async function updateTemplate(session: Session, kind: TemplateKind, id: s
           account_id = ${value.accountId}, expected_day = ${value.day} WHERE id = ${latest[0].id}`
       }
       const rows = await tx`UPDATE recurring_incomes SET name = ${value.name}, default_amount = ${value.defaultAmount},
-        account_id = ${value.accountId}, expected_day = ${value.day}, active_to = ${value.activeTo},
+        account_id = ${value.accountId}, expected_day = ${value.day}, active_to = ${value.activeTo}, amount_varies = ${value.amountVaries ?? false},
         version = version + 1, updated_at = now() WHERE id = ${id} RETURNING *`
       await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
         VALUES (${session.householdId}, ${session.userId}, 'RecurringIncome', ${id}, 'update', ${version}, ${version + 1})`

@@ -3,7 +3,8 @@ import type { MoneyIncome, MoneyPayment } from '../server/money'
 
 // Settings as they apply to one month: the version effective on its first day. Amounts are in grosz.
 export type PaymentTemplate = { id: string; name: string; category: string; accountId: string; amount: number; day: number | null; schedule: 'monthly' | 'weekly'; weekdays: number[] | null }
-export type IncomeTemplate = { id: string; name: string; accountId: string; amount: number; day: number | null }
+// `varies`: the amount changes month to month, so the month gets it as an estimate to check.
+export type IncomeTemplate = { id: string; name: string; accountId: string; amount: number; day: number | null; varies: boolean }
 
 const whenever = 'в течение месяца'
 
@@ -26,7 +27,7 @@ export function paymentFromTemplate(month: string, template: PaymentTemplate, id
 }
 
 export function incomeFromTemplate(month: string, template: IncomeTemplate, id: string): MoneyIncome {
-  return { id, recurringIncomeId: template.id, name: template.name, amount: template.amount, accountId: template.accountId, expectedOn: dayInMonth(month, template.day) ?? '', enabled: true, status: 'expected' }
+  return { id, recurringIncomeId: template.id, name: template.name, amount: template.amount, accountId: template.accountId, expectedOn: dayInMonth(month, template.day) ?? '', enabled: true, status: 'expected', amountPending: template.varies }
 }
 
 export type Merge<T> = { value: T; kept: string[] }
@@ -65,5 +66,8 @@ export function mergeIncome(month: string, row: MoneyIncome | null, before: Inco
     if (row[key] !== next[key]) kept.push(label)
     return row[key]
   }
-  return { value: { ...row, recurringIncomeId: after.id, name: pick('name', 'название'), amount: pick('amount', 'сумма'), accountId: pick('accountId', 'счёт'), expectedOn: pick('expectedOn', 'дата') }, kept }
+  const followsSettings = !old || row.amount === old.amount
+  // An amount still taken from settings is an estimate to check while settings say it varies; one set in the month is not.
+  const amountPending = after.varies && row.status === 'expected' && followsSettings && (Boolean(row.amountPending) || !before?.varies)
+  return { value: { ...row, recurringIncomeId: after.id, name: pick('name', 'название'), amount: pick('amount', 'сумма'), accountId: pick('accountId', 'счёт'), expectedOn: pick('expectedOn', 'дата'), amountPending }, kept }
 }

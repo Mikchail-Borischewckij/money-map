@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from 'react'
-import { Button, Dialog, Field, MoneyInput, Segmented, Select, TextInput, WeekdayPicker } from '@/components/ui'
+import { Button, Checkbox, Dialog, Field, MoneyInput, Segmented, Select, TextInput, WeekdayPicker } from '@/components/ui'
 import { dayOptions } from '@/lib/format'
 import type { AccountRow, Category, TemplateForm, TemplateKind } from './types'
 
-const empty = (accountId: string): TemplateForm => ({ name: '', amount: 0, accountId, day: null, categoryId: '', schedule: 'monthly', weekdays: [] })
+const empty = (accountId: string): TemplateForm => ({ name: '', amount: 0, accountId, day: null, categoryId: '', schedule: 'monthly', weekdays: [], amountVaries: false })
 
 export default function TemplateDialog({ kind, value, accounts, categories, onClose, onSave }: { kind: TemplateKind; value: TemplateForm | null; accounts: AccountRow[]; categories: Category[]; onClose: () => void; onSave: (value: TemplateForm) => void }) {
   const [form, setForm] = useState<TemplateForm>(value ?? empty(accounts[0]?.id ?? ''))
@@ -29,6 +29,8 @@ export default function TemplateDialog({ kind, value, accounts, categories, onCl
       <Field label={weekly ? 'Цена за раз' : 'Сумма'}><MoneyInput label="Сумма" value={form.amount} onChange={(amount) => set({ amount })} /></Field>
       <Field label={kind === 'payment' ? 'Со счёта' : 'На счёт'}><Select label="Счёт" value={form.accountId} options={accounts.map((account) => ({ value: account.id, label: account.name }))} onChange={(accountId) => set({ accountId })} /></Field>
       {kind === 'payment' && <Field label="Категория"><Select label="Категория" value={form.categoryId} placeholder="Без категории" options={[{ value: '', label: 'Без категории' }, ...categories.map((category) => ({ value: category.id, label: category.name }))]} onChange={(categoryId) => set({ categoryId })} /></Field>}
+      {kind === 'income' && <div className="field-wide"><Checkbox checked={form.amountVaries} onChange={(amountVaries) => set({ amountVaries })}>Сумма меняется от месяца к месяцу</Checkbox>
+        {form.amountVaries && <p className="note">Укажите сумму, на которую можно рассчитывать наверняка. В каждом месяце её нужно будет уточнить, а до этого итог будет предварительным.</p>}</div>}
       {weekly && <p className="note field-wide">В месяце: цена × число этих дней. Количество можно поправить в самом месяце.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <button type="submit" hidden />

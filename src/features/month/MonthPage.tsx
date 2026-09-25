@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Badge, Button, Dialog } from '@/components/ui'
 import type { MonthPlanState } from '@/hooks/useMonthPlan'
 import { money, monthName } from '@/lib/format'
+import { amountToCheck } from '@/lib/domain'
 import MonthView from './MonthView'
 
 export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: string[]; onOpenSettings: () => void }) {
@@ -11,8 +12,10 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
   const { plan, summary, open, nextMonth } = month
   const liveAccounts = plan.accounts.filter((account) => !account.isArchived)
   const unchecked = liveAccounts.filter((account) => !account.balanceConfirmed).length
+  const incomesToCheck = plan.incomes.filter(amountToCheck).length
   const closeBlocker = liveAccounts.length === 0 ? 'Добавьте счёт в настройках.'
     : unchecked > 0 ? `Проверьте остатки: осталось ${unchecked}.`
+    : incomesToCheck > 0 ? `Уточните суммы доходов: осталось ${incomesToCheck}.`
     : month.dirty || month.saveState === 'saving' ? 'Сохраняем изменения…' : ''
   const saveText = month.saveState === 'conflict' ? 'Конфликт' : month.saveState === 'error' ? 'Не сохранено' : month.saveState === 'saving' || month.dirty ? 'Сохраняем…' : 'Сохранено'
   const actions = { onResetPayment: (id: string) => void month.reset('payments', id), onResetIncome: (id: string) => void month.reset('incomes', id), onOpenSettings }
