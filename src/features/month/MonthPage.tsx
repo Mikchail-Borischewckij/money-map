@@ -5,6 +5,7 @@ import { Badge, Button, Dialog } from '@/components/ui'
 import type { MonthPlanState } from '@/hooks/useMonthPlan'
 import { money, monthName, periodTitle } from '@/lib/format'
 import { amountToCheck } from '@/lib/domain'
+import BalancesDate from './BalancesDate'
 import MonthView from './MonthView'
 
 export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: string[]; onOpenSettings: () => void }) {
@@ -44,6 +45,7 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
         <Badge tone={open ? 'blue' : 'neutral'}>{open ? 'Открыт' : 'Закрыт'}</Badge>
         {open && <span className="save-state" aria-live="polite">{saveText}</span>}
       </div>
+      {liveAccounts.length > 0 && <BalancesDate plan={plan} readOnly={!open} update={month.update} />}
     </header>
     {open && liveAccounts.length === 0 ? <div className="card onboarding">
       <h2>Начните с настроек</h2>

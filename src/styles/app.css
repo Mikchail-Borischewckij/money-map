@@ -290,7 +290,7 @@
 @media (max-width: 640px) {
   .data-table .col-opt { display: none; }
   .section-head { flex-wrap: wrap; }
-  .section-head > .balances-date { flex: 1 1 100%; }
+  .page-head > .balances-date { flex: 1 1 100%; }
   .balances-date .select-compact { flex: 1; width: auto; }
   .cell-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; font-size: 13px; color: var(--muted); }
   .data-table th, .data-table td { padding: 10px 6px; }

@@ -1,37 +1,21 @@
-import { AccountBadge, Badge, Button, Checkbox, Empty, Select } from '@/components/ui'
+import { AccountBadge, Badge, Button, Checkbox, Empty } from '@/components/ui'
 import { accountHue } from '@/lib/account-color'
 import type { Account, Plan } from '@/lib/domain'
-import { dayLabel, money } from '@/lib/format'
-import { countWeekdaysInPeriod, periodDays } from '@/lib/period'
+import { money } from '@/lib/format'
 import Amount from './Amount'
 import Section from './Section'
-import { periodOfPlan, round, total, type UpdatePlan } from './utils'
+import { total, type UpdatePlan } from './utils'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
 export default function BalancesSection({ plan, readOnly, update, onOpenSettings }: { plan: Plan; readOnly: boolean; update: UpdatePlan; onOpenSettings: () => void }) {
   const accounts = plan.accounts.filter((account) => !account.isArchived || account.openingBalance !== 0)
   const checked = accounts.filter((account) => account.balanceConfirmed).length
-  const period = periodOfPlan(plan)
-  // A new balances date recounts weekly payments that still follow the calendar; counts changed by hand stay.
-  const setDate = (balancesOn: string) => update((current) => {
-    const before = periodOfPlan(current)
-    const after = { ...before, from: balancesOn }
-    return { ...current, balancesOn, payments: current.payments.map((payment) => {
-      if (payment.unitPrice == null || payment.quantity == null || !payment.weekdays || payment.quantity !== countWeekdaysInPeriod(before, payment.weekdays)) return payment
-      const quantity = countWeekdaysInPeriod(after, payment.weekdays)
-      return { ...payment, quantity, amount: round(payment.unitPrice * quantity) }
-    }) }
-  })
-  const dateOptions = periodDays(period).map((day) => ({ value: day, label: dayLabel(day) }))
   const change = (id: string, patch: Partial<Account>) => update((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === id ? { ...account, ...patch } : account) }))
-  const date = plan.balancesOn ?? dateOptions[0]?.value
   const done = accounts.length > 0 && checked === accounts.length
   const sum = total(accounts.map((account) => ({ amount: account.openingBalance })))
   return <Section step={1} title="Остатки на счетах" done={done}
-    meta={accounts.length > 0 && (done ? <span>{money(sum)}</span> : <Badge tone="warn">Проверено {checked} из {accounts.length}</Badge>)}
-    action={readOnly ? date && <span className="section-meta">на {dayLabel(date)}</span>
-      : <div className="balances-date"><span>на</span><Select compact label="Остатки на дату" value={date ?? ''} options={dateOptions} onChange={setDate} /></div>}>
+    meta={accounts.length > 0 && (done ? <span>{money(sum)}</span> : <Badge tone="warn">Проверено {checked} из {accounts.length}</Badge>)}>
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}
     <div className="rows">
       {accounts.map((account) => <div className="row" key={account.id}>

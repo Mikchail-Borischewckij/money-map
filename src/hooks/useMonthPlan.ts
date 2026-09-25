@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toApiPlan, toUiPlan, toUiSummary, type ServerRecord } from '@/lib/api-client'
 import { calculatePlan, type Plan } from '@/lib/domain'
+import { countFromToday } from '@/features/month/utils'
 
 export type SaveState = 'saved' | 'saving' | 'error' | 'conflict'
 
@@ -10,7 +11,8 @@ const post = (url: string, csrfToken: string, body: unknown = {}) => fetch(url, 
 
 // The current month: the open one (edited with optimistic autosave and a version check) or the last closed one.
 export function useMonthPlan({ initial, initialNext, csrfToken }: { initial: ServerRecord; initialNext: string | null; csrfToken: string }) {
-  const [plan, setPlan] = useState<Plan>(() => toUiPlan(initial.plan))
+  // An open month whose balances are not checked yet moves to today; the change is saved like any edit.
+  const [plan, setPlan] = useState<Plan>(() => initial.status === 'Draft' ? countFromToday(toUiPlan(initial.plan)) : toUiPlan(initial.plan))
   const [savedPlan, setSavedPlan] = useState<Plan>(() => toUiPlan(initial.plan))
   const [recordId, setRecordId] = useState(initial.id)
   const [status, setStatus] = useState(initial.status)
