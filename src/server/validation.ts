@@ -50,8 +50,7 @@ export const planInput = z.object({
 export const templateInput = z.object({
   name, defaultAmount: moneySchema, accountId: uuid,
   day: z.number().int().min(1).max(31).nullable(),
-  activeFrom: z.iso.date(), activeTo: z.iso.date().nullable(),
   categoryId: uuid.nullable().optional(), version: z.number().int().positive().optional(),
   schedule: z.enum(['monthly', 'weekly']).default('monthly'), weekdays: weekdays.nullable().default(null),
-}).refine((value) => !value.activeTo || value.activeTo >= value.activeFrom, { message: 'End date must follow start date' })
-  .refine((value) => value.schedule === 'weekly' ? value.weekdays !== null && value.day === null : value.weekdays === null, { message: 'Weekly schedule needs weekdays and no day' })
+  ended: z.boolean().default(false),
+}).refine((value) => value.schedule === 'weekly' ? value.weekdays !== null && value.day === null : value.weekdays === null, { message: 'Weekly schedule needs weekdays and no day' })

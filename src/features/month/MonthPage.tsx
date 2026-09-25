@@ -1,0 +1,61 @@
+"use client"
+
+import { useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { Badge, Button, Dialog } from '@/components/ui'
+import type { MonthPlanState } from '@/hooks/useMonthPlan'
+import { money, monthName } from '@/lib/format'
+import MonthView from './MonthView'
+import TemplateSync from './TemplateSync'
+
+export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: string[]; onOpenSettings: () => void }) {
+  const [confirmClose, setConfirmClose] = useState(false)
+  const { plan, summary, open, nextMonth } = month
+  const liveAccounts = plan.accounts.filter((account) => !account.isArchived)
+  const unchecked = liveAccounts.filter((account) => !account.balanceConfirmed).length
+  const closeBlocker = liveAccounts.length === 0 ? 'Добавьте счёт в настройках.'
+    : unchecked > 0 ? `Проверьте остатки: осталось ${unchecked}.`
+    : month.dirty || month.saveState === 'saving' ? 'Сохраняем изменения…' : ''
+  const saveText = month.saveState === 'conflict' ? 'Конфликт' : month.saveState === 'error' ? 'Не сохранено' : month.saveState === 'saving' || month.dirty ? 'Сохраняем…' : 'Сохранено'
+  const actions = { onResetPayment: (id: string) => void month.reset('payments', id), onResetIncome: (id: string) => void month.reset('incomes', id), onOpenSettings }
+
+  const footer = open
+    ? <div className="card close-card">
+      <Button variant="primary" className="btn-block" disabled={Boolean(closeBlocker)} onClick={() => setConfirmClose(true)}>Закрыть месяц</Button>
+      {closeBlocker && <p className="muted">{closeBlocker}</p>}
+    </div>
+    : nextMonth && <div className="card close-card">
+      <p className="muted">Ошиблись? Месяц можно открыть снова, пока следующий не начат.</p>
+      <Button className="btn-block" onClick={() => void month.reopenMonth()}>Открыть снова</Button>
+    </div>
+
+  return <div className="page">
+    {!open && nextMonth && <div className="card next-month">
+      <div><h2>{monthName(plan.month, false)} закрыт</h2><p className="muted">Можно начинать следующий месяц.</p></div>
+      <Button variant="primary" onClick={() => void month.startNext()}>Начать {monthName(nextMonth, false).toLowerCase()}</Button>
+    </div>}
+    <header className="page-head">
+      <div className="page-title">
+        <h1>{monthName(plan.month)}</h1>
+        <Badge tone={open ? 'blue' : 'neutral'}>{open ? 'Открыт' : 'Закрыт'}</Badge>
+        {open && <span className="save-state" aria-live="polite">{saveText}</span>}
+      </div>
+      {open && liveAccounts.length > 0 && <Button icon={<RefreshCw size={16} />} onClick={() => void month.openSync()}>Обновить из настроек</Button>}
+    </header>
+    {open && !month.sync && month.pendingChanges > 0 && <div className="card notice">
+      <span>В настройках есть изменения, которых нет в этом месяце: {month.pendingChanges}.</span>
+      <Button size="sm" variant="primary" onClick={() => void month.openSync()}>Посмотреть</Button>
+    </div>}
+    {month.sync && open && <TemplateSync changes={month.sync} accounts={plan.accounts} onApply={month.applySync} onClose={month.closeSync} />}
+    {open && liveAccounts.length === 0 ? <div className="card onboarding">
+      <h2>Начните с настроек</h2>
+      <ol><li>Добавьте счета.</li><li>Добавьте регулярные доходы и платежи.</li><li>Вернитесь сюда — месяц соберётся из настроек.</li></ol>
+      <Button variant="primary" onClick={onOpenSettings}>Открыть настройки</Button>
+    </div> : <MonthView plan={plan} summary={summary} readOnly={!open} categories={categories} actions={actions} update={month.update} footer={footer} />}
+    {confirmClose && <Dialog title={`Закрыть ${monthName(plan.month, false).toLowerCase()}?`} onClose={() => setConfirmClose(false)}
+      actions={<><Button onClick={() => setConfirmClose(false)}>Отмена</Button><Button variant="primary" onClick={() => { setConfirmClose(false); void month.closeMonth() }}>Закрыть месяц</Button></>}>
+      <p>После закрытия месяц можно только смотреть. Изменения в настройках его не затронут.</p>
+      <p className="muted">Итог: {summary.freeAfterPlan < 0 ? 'не хватает' : 'свободно'} {money(Math.abs(summary.freeAfterPlan))}.</p>
+    </Dialog>}
+  </div>
+}

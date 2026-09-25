@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { demoPlan } from '../demo-plan'
-import { toApiPlan } from '../api-client'
+import { demoPlan } from '../lib/demo-plan'
+import { toApiPlan } from '../lib/api-client'
 import { calculateMoneyPlan, type MoneyPlan } from './money'
 
 const example = () => structuredClone(toApiPlan(demoPlan))

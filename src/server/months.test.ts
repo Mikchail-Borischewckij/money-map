@@ -1,0 +1,18 @@
+import { describe, expect, it } from 'vitest'
+import { calendarMonth, monthToStart } from './plans'
+
+describe('which month starts next', () => {
+  it('starts the calendar month when there are no months yet', () => {
+    expect(monthToStart(null, { year: 2026, month: 9 })).toEqual({ year: 2026, month: 9 })
+  })
+  it('starts the month after the last one, across the year boundary', () => {
+    expect(monthToStart({ year: 2026, month: 9 }, { year: 2026, month: 9 })).toEqual({ year: 2026, month: 10 })
+    expect(monthToStart({ year: 2026, month: 12 }, { year: 2026, month: 12 })).toEqual({ year: 2027, month: 1 })
+  })
+  it('skips to the calendar month after a long pause', () => {
+    expect(monthToStart({ year: 2026, month: 5 }, { year: 2026, month: 9 })).toEqual({ year: 2026, month: 9 })
+  })
+  it('uses Warsaw time for the calendar month', () => {
+    expect(calendarMonth(new Date('2026-09-30T22:30:00Z'))).toEqual({ year: 2026, month: 10 })
+  })
+})

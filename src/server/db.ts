@@ -9,7 +9,8 @@ export function db() {
     client = postgres(connection, {
       ssl: process.env.DATABASE_SSL === 'disable' ? false : 'require',
       prepare: false,
-      max: 3,
+      // DATABASE_POOL_MAX=1 suits single-connection local databases such as PGlite.
+      max: Number(process.env.DATABASE_POOL_MAX) || 3,
       idle_timeout: 20,
     })
   }

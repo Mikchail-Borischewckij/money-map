@@ -1,5 +1,6 @@
 import type { Session } from './auth'
 import { db, intArray } from './db'
+import { calendarMonth, monthToStart } from './plans'
 
 export type TemplateKind = 'income' | 'payment'
 export type TemplateValue = {
@@ -7,12 +8,29 @@ export type TemplateValue = {
   defaultAmount: number
   accountId: string
   day: number | null
-  activeFrom: string
-  activeTo: string | null
+  ended: boolean
   categoryId?: string | null
   version?: number
   schedule?: 'monthly' | 'weekly'
   weekdays?: number[] | null
+}
+
+const firstOf = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}-01`
+const dayBefore = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
+
+// Settings changes apply from the open month (it picks them up via "update from settings") or, with no open month,
+// from the month that will be started next. Closed months keep their snapshots either way.
+// A template that is "no longer needed" stays in the open month and is left out of every later one.
+export async function settingsWindow(session: Session) {
+  const plans = await db()`SELECT year, month, status FROM monthly_plans WHERE household_id = ${session.householdId}
+    ORDER BY (status = 'Draft') DESC, year DESC, month DESC LIMIT 1`
+  if (plans[0]?.status === 'Draft') {
+    const next = plans[0].month === 12 ? firstOf(plans[0].year + 1, 1) : firstOf(plans[0].year, plans[0].month + 1)
+    return { effectiveFrom: firstOf(plans[0].year, plans[0].month), endDate: dayBefore(next) }
+  }
+  const start = plans[0] ? monthToStart({ year: plans[0].year, month: plans[0].month }) : calendarMonth()
+  const effectiveFrom = firstOf(start.year, start.month)
+  return { effectiveFrom, endDate: dayBefore(effectiveFrom) }
 }
 
 export async function listTemplates(session: Session, kind: TemplateKind) {
@@ -38,8 +56,11 @@ async function referencesValid(session: Session, value: TemplateValue) {
   return true
 }
 
-export async function createTemplate(session: Session, kind: TemplateKind, value: TemplateValue) {
-  if (!await referencesValid(session, value)) return null
+export async function createTemplate(session: Session, kind: TemplateKind, input: TemplateValue) {
+  if (!await referencesValid(session, input)) return null
+  const window = await settingsWindow(session)
+  const value = { ...input, activeFrom: window.effectiveFrom, activeTo: input.ended ? window.endDate : null }
+  if (value.activeTo && value.activeTo < value.activeFrom) return null
   return db().begin(async (tx) => {
     if (kind === 'income') {
       const rows = await tx`INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, expected_day, active_from, active_to)
@@ -62,18 +83,24 @@ export async function createTemplate(session: Session, kind: TemplateKind, value
   })
 }
 
-export async function updateTemplate(session: Session, kind: TemplateKind, id: string, value: TemplateValue) {
-  const version = value.version
-  if (!version || !await referencesValid(session, value)) return null
+export async function updateTemplate(session: Session, kind: TemplateKind, id: string, input: TemplateValue) {
+  const version = input.version
+  if (!version || !await referencesValid(session, input)) return null
+  const window = await settingsWindow(session)
   return db().begin(async (tx) => {
     const current = kind === 'income'
-      ? await tx`SELECT version, active_from::text FROM recurring_incomes WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`
-      : await tx`SELECT version, active_from::text FROM recurring_payments WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`
+      ? await tx`SELECT version, active_from::text, active_to::text FROM recurring_incomes WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`
+      : await tx`SELECT version, active_from::text, active_to::text FROM recurring_payments WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`
     if (!current[0] || current[0].version !== version) return null
+    // An already ended template keeps its original end, so editing it never brings it back into months in between.
+    const value = { ...input, activeFrom: window.effectiveFrom, activeTo: input.ended ? current[0].active_to ?? window.endDate : null }
+    if (value.activeTo && value.activeTo < current[0].active_from) return null
     const latest = kind === 'income'
       ? await tx`SELECT id, effective_from::text FROM income_template_versions WHERE recurring_income_id = ${id} ORDER BY effective_from DESC LIMIT 1 FOR UPDATE`
       : await tx`SELECT id, effective_from::text FROM payment_template_versions WHERE recurring_payment_id = ${id} ORDER BY effective_from DESC LIMIT 1 FOR UPDATE`
-    if (!latest[0] || value.activeFrom < latest[0].effective_from) return null
+    // A version that starts before the settings month may already be in closed months, so it is closed off and a new one begins.
+    // A version starting at or after it is not used by any closed month and is edited in place.
+    if (!latest[0]) return null
     if (kind === 'income') {
       if (value.activeFrom > latest[0].effective_from) {
         await tx`UPDATE income_template_versions SET effective_to = (${value.activeFrom}::date - 1) WHERE id = ${latest[0].id}`

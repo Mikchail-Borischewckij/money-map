@@ -1,0 +1,75 @@
+:root {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f1f4fa;
+  --surface-3: #e8edf6;
+  --border: #e2e7f0;
+  --border-strong: #c9d2e1;
+  --text: #0f172a;
+  --text-2: #3b4a63;
+  --muted: #66758f;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-soft: #eaf1ff;
+  --primary-ink: #1e40af;
+  --hero-from: #2563eb;
+  --hero-to: #1e3a8a;
+  --danger: #dc2626;
+  --danger-soft: #fdeeee;
+  --danger-from: #e0413a;
+  --danger-to: #9f1d1d;
+  --warn: #b45309;
+  --warn-soft: #fff4e0;
+  --ok: #0369a1;
+  --ok-soft: #e3f3fd;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow: 0 1px 2px rgb(15 23 42 / 4%), 0 2px 8px rgb(15 23 42 / 4%);
+  --shadow-pop: 0 12px 32px rgb(15 23 42 / 14%), 0 2px 6px rgb(15 23 42 / 8%);
+  --focus: 0 0 0 3px rgb(37 99 235 / 28%);
+  color-scheme: light;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0a1020;
+    --surface: #10192d;
+    --surface-2: #16213a;
+    --surface-3: #1d2a47;
+    --border: #1f2c48;
+    --border-strong: #2e3e62;
+    --text: #e6edf8;
+    --text-2: #b8c4d9;
+    --muted: #8595b2;
+    --primary: #4f8dff;
+    --primary-hover: #6fa2ff;
+    --primary-soft: #172a52;
+    --primary-ink: #a8c5ff;
+    --hero-from: #2f6bf0;
+    --hero-to: #1a2f78;
+    --danger: #f87171;
+    --danger-soft: #3a1519;
+    --danger-from: #c63a34;
+    --danger-to: #6e1616;
+    --warn: #fbbf24;
+    --warn-soft: #33260c;
+    --ok: #5cc4f5;
+    --ok-soft: #0e2a40;
+    --shadow: 0 1px 2px rgb(0 0 0 / 30%);
+    --shadow-pop: 0 16px 40px rgb(0 0 0 / 50%);
+    --focus: 0 0 0 3px rgb(79 141 255 / 40%);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+h1, h2, h3, p { margin: 0; }
+:focus-visible { outline: none; box-shadow: var(--focus); }

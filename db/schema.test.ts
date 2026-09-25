@@ -70,3 +70,28 @@ it('stores weekly payment schedules and keeps per-unit amounts consistent', asyn
     await pg.close()
   }
 })
+
+it('removes old months, keeps one open month per household and adds starter categories once', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    for (const file of ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql']) {
+      await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    }
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    const user = (await pg.query<{ id: string }>("INSERT INTO users (household_id, google_subject, initial_email, email, display_name) VALUES ($1, 's', 't@example.invalid', 't@example.invalid', 'T') RETURNING id", [household])).rows[0].id
+    const plan = 'INSERT INTO monthly_plans (household_id, year, month, status, created_by, updated_by) VALUES ($1, 2026, $2, $3, $4, $4)'
+    await pg.query(plan, [household, 9, 'Draft', user])
+    await pg.query(plan, [household, 10, 'Draft', user])
+    await pg.query("INSERT INTO categories (household_id, name) VALUES ($1, 'жильё')", [household])
+    await pg.exec(await readFile(new URL('./migrations/004_single_open_month.sql', import.meta.url), 'utf8'))
+    expect((await pg.query('SELECT id FROM monthly_plans')).rows).toHaveLength(0)
+    const categories = await pg.query<{ name: string }>('SELECT name FROM categories ORDER BY display_order, name')
+    expect(categories.rows).toHaveLength(12)
+    expect(categories.rows.map((row) => row.name)).toContain('жильё')
+    await pg.query(plan, [household, 9, 'Finalized', user])
+    await pg.query(plan, [household, 10, 'Draft', user])
+    await expect(pg.query(plan, [household, 11, 'Draft', user])).rejects.toThrow()
+  } finally {
+    await pg.close()
+  }
+})
