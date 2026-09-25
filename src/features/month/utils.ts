@@ -26,3 +26,5 @@ export const incomeStatuses = [
   { value: 'included', label: 'Уже на счёте' },
   { value: 'excluded', label: 'Не будет' },
 ] as const
+
+export const savingsOf = (plan: Plan) => plan.allocations.find((allocation) => allocation.kind === 'savings')

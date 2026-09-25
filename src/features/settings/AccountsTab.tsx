@@ -1,8 +1,9 @@
 "use client"
 
 import { useState } from 'react'
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
-import { Button, Empty, RowMenu } from '@/components/ui'
+import { ArrowDown, ArrowRight, ArrowUp, Plus } from 'lucide-react'
+import { AccountBadge, Button, Empty, RowMenu } from '@/components/ui'
+import { accountHue } from '@/lib/account-color'
 import { toCents } from '@/lib/api-client'
 import { money } from '@/lib/format'
 import AccountDialog, { type AccountValue } from './AccountDialog'
@@ -32,14 +33,15 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
   }
 
   const fields = (value: AccountValue): Partial<AccountRow> => ({ name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers, sweep_to_account_id: value.sweepToAccountId, keep_amount: toCents(value.keepAmount) })
-  const detail = (account: AccountRow) => {
-    const kind = kindOptions.find((option) => option.value === account.kind)?.label
+  const kindLabel = (account: AccountRow) => kindOptions.find((option) => option.value === account.kind)?.label
+  const badge = (id: string) => <AccountBadge name={accounts.find((item) => item.id === id)?.name ?? 'Счёт удалён'} hue={accountHue(accounts, id)} />
+  // How the account takes part in transfers.
+  const transfers = (account: AccountRow) => {
     if (account.kind === 'business') {
-      const target = accounts.find((item) => item.id === account.sweep_to_account_id)?.name
       const keep = Number(account.keep_amount ?? 0)
-      return [kind, target ? `остаток → ${target}` : 'остаток никуда не переводится', keep > 0 ? `запас ${money(keep / 100)}` : ''].filter(Boolean).join(' · ')
+      return <span className="cell-flow">{account.sweep_to_account_id ? <>Остаток <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Остаток не переводится'}{keep > 0 && <span className="muted">запас {money(keep / 100)}</span>}</span>
     }
-    return `${kind}${account.can_fund_transfers ? '' : ' · не для переводов'}`
+    return account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>
   }
   const save = (value: AccountValue) => {
     const current = editing === 'new' ? null : editing
@@ -53,24 +55,28 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
   }
 
   return <section className="card">
-    <header className="card-head"><div><h2>Счета</h2><p className="muted">Порядок — откуда в первую очередь брать деньги на переводы.</p></div>
+    <header className="card-head"><div><h2>Счета</h2><p className="muted">№ — откуда в первую очередь брать деньги на переводы.</p></div>
       <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>Счёт</Button></header>
     {active.length === 0 && <Empty>Счетов пока нет.</Empty>}
-    <div className="rows">
-      {active.map((account, index) => <div className="row" key={account.id}>
-        <div className="row-main"><strong>{account.name}</strong><span className="row-meta">{detail(account)}</span></div>
-        <div className="row-side">
+    {active.length > 0 && <div className="table-scroll"><table className="data-table">
+      <thead><tr><th className="num col-narrow">№</th><th>Счёт</th><th className="col-opt">Тип</th><th className="col-opt">Переводы</th><th className="actions"><span className="sr-only">Действия</span></th></tr></thead>
+      <tbody>{active.map((account, index) => <tr key={account.id}>
+        <td className="num col-narrow muted">{index + 1}</td>
+        <td>{badge(account.id)}<div className="cell-sub"><span>{kindLabel(account)}</span>{transfers(account)}</div></td>
+        <td className="col-opt">{kindLabel(account)}</td>
+        <td className="col-opt">{transfers(account)}</td>
+        <td className="actions"><div className="cell-actions">
           <Button variant="ghost" size="sm" aria-label={`Выше: ${account.name}`} icon={<ArrowUp size={16} />} disabled={index === 0} onClick={() => void move(index, -1)} />
           <Button variant="ghost" size="sm" aria-label={`Ниже: ${account.name}`} icon={<ArrowDown size={16} />} disabled={index === active.length - 1} onClick={() => void move(index, 1)} />
           <RowMenu label={`Действия: ${account.name}`} items={[
             { label: 'Изменить', onSelect: () => setEditing(account) },
             { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
           ]} />
-        </div>
-      </div>)}
-    </div>
+        </div></td>
+      </tr>)}</tbody>
+    </table></div>}
     {archived.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowArchived(!showArchived)}>{showArchived ? 'Скрыть архив' : `Архив · ${archived.length}`}</button>}
-    {showArchived && <div className="rows">{archived.map((account) => <div className="row is-muted" key={account.id}><div className="row-main"><strong>{account.name}</strong></div></div>)}</div>}
+    {showArchived && <table className="data-table"><tbody>{archived.map((account) => <tr className="is-muted" key={account.id}><td className="cell-name">{account.name}</td><td className="col-opt">{kindLabel(account)}</td></tr>)}</tbody></table>}
     {editing && <AccountDialog account={editing === 'new' ? null : editing} accounts={accounts} onClose={() => setEditing(null)} onSave={save} />}
   </section>
 }

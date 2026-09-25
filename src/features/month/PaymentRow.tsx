@@ -6,13 +6,14 @@ import { weekdayLabel } from '@/lib/schedule'
 import Amount from './Amount'
 import { dayText, round } from './utils'
 
-export default function PaymentRow({ payment, period, readOnly, accountName, onChange, onRemove, onReset }: {
-  payment: Payment; period: Period; readOnly: boolean; accountName: (id: string) => string
+export default function PaymentRow({ payment, period, readOnly, accountTag, onChange, onRemove, onReset }: {
+  payment: Payment; period: Period; readOnly: boolean; accountTag: (id: string) => React.ReactNode
   onChange: (patch: Partial<Payment>) => void; onRemove: () => void; onReset: () => void
 }) {
   const weekly = payment.unitPrice != null && payment.quantity != null
   const when = weekly && payment.weekdays ? weekdayLabel(payment.weekdays) : dayText(payment.due)
-  const meta = [when, accountName(payment.accountId), payment.category].filter(Boolean).join(' · ')
+  const details = [when, payment.category].filter(Boolean).join(' · ')
+  const meta = <>{accountTag(payment.accountId)}{details && <span>{details}</span>}</>
 
   if (!payment.enabled) return <div className="row is-muted">
     <div className="row-main"><strong>{payment.name}</strong>
@@ -29,7 +30,7 @@ export default function PaymentRow({ payment, period, readOnly, accountName, onC
   const setQuantity = (quantity: number) => onChange({ quantity, amount: round(payment.unitPrice! * quantity) })
   const toCheck = amountToCheck(payment)
   return <div className="row">
-    <div className="row-main"><strong>{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}{toCheck && <Badge tone="warn">уточните сумму</Badge>}</strong><span className="row-meta">{meta}</span></div>
+    <div className="row-main"><strong>{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}{toCheck && <Badge tone="warn">уточните сумму</Badge>}</strong><span className="row-meta row-tags">{meta}</span></div>
     <div className="row-side row-side-wrap">
       {weekly ? <>
         <div className="units">

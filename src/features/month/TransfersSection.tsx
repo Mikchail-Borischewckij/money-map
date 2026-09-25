@@ -6,7 +6,7 @@ import Section from './Section'
 const signed = (value: number) => value === 0 ? '—' : `${value > 0 ? '+' : '−'} ${amount(Math.abs(value))}`
 
 // Per account: what it has, what leaves it, the transfers in or out and what stays; then the transfers to make, in order.
-export default function TransfersSection({ step, summary, accountName }: { step: number; summary: PlanSummary; accountName: (id: string) => string }) {
+export default function TransfersSection({ step, summary, accountTag }: { step: number; summary: PlanSummary; accountTag: (id: string) => React.ReactNode }) {
   const accounts = summary.accounts.filter((account) => !account.isArchived || account.available || account.needed || account.incoming || account.outgoing)
   if (accounts.length === 0) return null
   const sum = (pick: (account: typeof accounts[number]) => number) => accounts.reduce((total, account) => total + pick(account), 0)
@@ -16,7 +16,7 @@ export default function TransfersSection({ step, summary, accountName }: { step:
         <thead><tr><th>Счёт</th><th>Есть и придёт</th><th>Уйдёт</th><th>Перевод</th><th>Останется</th></tr></thead>
         <tbody>
           {accounts.map((account) => <tr key={account.id}>
-            <th scope="row">{account.name}{account.keep > 0 && <small>запас {amount(account.keep)}</small>}</th>
+            <th scope="row">{accountTag(account.id)}{account.keep > 0 && <small>запас {amount(account.keep)}</small>}</th>
             <td>{amount(account.available)}</td>
             <td>{account.payments + account.allocations ? `− ${amount(account.payments + account.allocations)}` : '—'}</td>
             <td className={cx(account.incoming - account.outgoing > 0 && 'is-in')}>{signed(account.incoming - account.outgoing)}</td>
@@ -35,7 +35,7 @@ export default function TransfersSection({ step, summary, accountName }: { step:
     <h3 className="subhead">Что перевести</h3>
     {summary.transfers.length === 0 ? <p className="muted">Переводы не нужны.</p> : <ol className="transfer-list">
       {summary.transfers.map((transfer) => <li key={transfer.id}>
-        <span className="transfer-route">{accountName(transfer.fromAccountId)}<ArrowRight size={14} />{accountName(transfer.toAccountId)}</span>
+        <span className="transfer-route">{accountTag(transfer.fromAccountId)}<ArrowRight size={14} />{accountTag(transfer.toAccountId)}</span>
         <strong className="amount">{money(transfer.amount)}</strong>
       </li>)}
     </ol>}

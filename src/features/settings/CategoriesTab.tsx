@@ -26,25 +26,27 @@ export default function CategoriesTab({ categories, csrfToken, run }: { categori
       <TextInput label="Новая категория" placeholder="Новая категория" value={name} onChange={setName} />
       <Button type="submit" variant="primary" icon={<Plus size={16} />} disabled={!name.trim()}>Добавить</Button>
     </form>
-    <div className="rows">
-      {active.map((category) => <div className="row" key={category.id}>
-        <div className="row-main"><strong>{category.name}</strong></div>
-        <div className="row-side"><RowMenu label={`Действия: ${category.name}`} items={[
+    {active.length > 0 && <table className="data-table">
+      <thead><tr><th>Категория</th><th>В платежах</th><th className="actions"><span className="sr-only">Действия</span></th></tr></thead>
+      <tbody>{active.map((category) => <tr key={category.id}>
+        <td className="cell-name">{category.name}</td>
+        <td>{category.in_use ? 'Используется' : <span className="muted">—</span>}</td>
+        <td className="actions"><RowMenu label={`Действия: ${category.name}`} items={[
           { label: 'Переименовать', onSelect: () => { setEditing(category); setDraft(category.name) } },
           category.in_use
             ? { label: 'В архив', danger: true, onSelect: () => void update(category, { is_archived: true }) }
             : { label: 'Удалить', danger: true, onSelect: () => void remove(category) },
-        ]} /></div>
-      </div>)}
-    </div>
+        ]} /></td>
+      </tr>)}</tbody>
+    </table>}
     {archived.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowArchived(!showArchived)}>{showArchived ? 'Скрыть архив' : `Архив · ${archived.length}`}</button>}
-    {showArchived && <div className="rows">{archived.map((category) => <div className="row is-muted" key={category.id}>
-      <div className="row-main"><strong>{category.name}</strong></div>
-      <div className="row-side">
+    {showArchived && <table className="data-table"><tbody>{archived.map((category) => <tr className="is-muted" key={category.id}>
+      <td className="cell-name">{category.name}</td>
+      <td className="actions"><div className="cell-actions">
         {!category.in_use && <Button size="sm" variant="ghost" onClick={() => void remove(category)}>Удалить</Button>}
         <Button size="sm" onClick={() => void update(category, { is_archived: false })}>Вернуть</Button>
-      </div>
-    </div>)}</div>}
+      </div></td>
+    </tr>)}</tbody></table>}
     {editing && <Dialog title="Переименовать" onClose={() => setEditing(null)} actions={<><Button onClick={() => setEditing(null)}>Отмена</Button><Button variant="primary" disabled={!draft.trim()} onClick={() => { void update(editing, { name: draft.trim() }); setEditing(null) }}>Сохранить</Button></>}>
       <Field label="Название" wide><TextInput label="Название" value={draft} onChange={setDraft} autoFocus /></Field>
     </Dialog>}

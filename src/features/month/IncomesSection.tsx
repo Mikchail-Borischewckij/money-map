@@ -10,7 +10,7 @@ import OneOffDialog from './OneOffDialog'
 import Section from './Section'
 import { dayInPlan, dayText, incomeStatuses, total, type UpdatePlan } from './utils'
 
-export default function IncomesSection({ plan, readOnly, update, accountName, accounts, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountName: (id: string) => string; accounts: Account[]; onReset: (id: string) => void }) {
+export default function IncomesSection({ plan, readOnly, update, accountTag, accounts, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountTag: (id: string) => React.ReactNode; accounts: Account[]; onReset: (id: string) => void }) {
   const [adding, setAdding] = useState(false)
   const change = (id: string, patch: Partial<Income>) => update((current) => ({ ...current, incomes: current.incomes.map((income) => income.id === id ? { ...income, ...patch } : income) }))
   const remove = (id: string) => update((current) => ({ ...current, incomes: current.incomes.filter((income) => income.id !== id) }))
@@ -29,7 +29,7 @@ export default function IncomesSection({ plan, readOnly, update, accountName, ac
         return <div className={cx('row', status === 'excluded' && 'is-muted')} key={income.id}>
           <div className="row-main">
             <strong>{income.name}{!income.recurringIncomeId && <Badge>разовый</Badge>}{amountToCheck(income) && <Badge tone="warn">уточните сумму</Badge>}</strong>
-            <span className="row-meta">{[accountName(income.accountId), dayText(income.expectedOn)].filter(Boolean).join(' · ')}</span>
+            <span className="row-meta row-tags">{accountTag(income.accountId)}{dayText(income.expectedOn) && <span>{dayText(income.expectedOn)}</span>}</span>
           </div>
           <div className="row-side row-side-wrap">
             {readOnly ? <Badge tone={status === 'excluded' ? 'neutral' : 'blue'}>{incomeStatuses.find((item) => item.value === status)?.label}</Badge>

@@ -1,4 +1,5 @@
-import { Badge, Button, Checkbox, Empty } from '@/components/ui'
+import { AccountBadge, Badge, Button, Checkbox, Empty } from '@/components/ui'
+import { accountHue } from '@/lib/account-color'
 import type { Account, Plan } from '@/lib/domain'
 import { money } from '@/lib/format'
 import Amount from './Amount'
@@ -16,7 +17,7 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}
     <div className="rows">
       {accounts.map((account) => <div className="row" key={account.id}>
-        <div className="row-main"><strong>{account.name}</strong><span className="row-meta">{kindLabel[account.kind]}</span></div>
+        <div className="row-main"><strong><AccountBadge name={account.name} hue={accountHue(plan.accounts, account.id)} /></strong><span className="row-meta">{kindLabel[account.kind]}</span></div>
         <div className="row-side">
           <Amount label={`Остаток: ${account.name}`} value={account.openingBalance} readOnly={readOnly}
             onChange={(openingBalance) => change(account.id, { openingBalance, balanceConfirmed: true, balanceDate: today() })} />

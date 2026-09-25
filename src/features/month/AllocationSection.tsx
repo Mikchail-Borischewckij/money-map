@@ -3,9 +3,7 @@ import { Button, Select } from '@/components/ui'
 import type { Account, Allocation, Plan } from '@/lib/domain'
 import Amount from './Amount'
 import Section from './Section'
-import type { UpdatePlan } from './utils'
-
-export const savingsOf = (plan: Plan) => plan.allocations.find((allocation) => allocation.kind === 'savings')
+import { savingsOf, type UpdatePlan } from './utils'
 
 // Optional: most months nothing is set aside. Whatever is left after payments and savings is the money for living.
 export default function AllocationSection({ plan, step, readOnly, update, accounts, accountName }: { plan: Plan; step: number; readOnly: boolean; update: UpdatePlan; accounts: Account[]; accountName: (id: string) => string }) {
