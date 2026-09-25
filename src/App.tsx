@@ -10,6 +10,8 @@ import { calculatePlan, type Account, type Income, type Payment, type Plan } fro
 import { toApiPlan, toUiPlan, toUiSummary, type ServerRecord } from './api-client'
 import TemplatesPage from './TemplatesPage'
 import PaymentsPage from './PaymentsPage'
+import TemplateSync from './TemplateSync'
+import { applyTemplateChanges, type TemplateChange } from './server/template-sync'
 import { AmountInput } from './fields'
 import './App.css'
 
@@ -31,6 +33,7 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
   const [view, setView] = useState<View>('overview')
   const [mobileNav, setMobileNav] = useState(false)
   const [addIncome, setAddIncome] = useState(false)
+  const [sync, setSync] = useState<TemplateChange[] | null>(null)
   const savedSnapshot = useRef(JSON.stringify(toUiPlan(initial.plan)))
   const versionRef = useRef(initial.version)
   const savingRef = useRef(false)
@@ -84,6 +87,7 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
     setServerSummary(toUiSummary(record.summary))
     setLastSaved({ at: record.updatedAt, by: record.updatedBy })
     setConflict(null)
+    setSync(null)
     setSaveState('saved')
     setPlan(next)
     setSavedPlan(next)
@@ -130,6 +134,22 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
     const response = await fetch(`/api/plans/${recordId}/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify({ expectedVersion: versionRef.current }) })
     if (!response.ok) { setErrorText(response.status === 422 ? 'Подтвердите начальные остатки всех счетов.' : 'План изменился. Обновите страницу.'); return }
     applyRecord(await response.json() as ServerRecord)
+  }
+
+  async function openSync() {
+    if (dirty || savingRef.current) { setErrorText('Сначала дождитесь сохранения.'); return }
+    const response = await fetch(`/api/plans/${recordId}/template-changes`, { cache: 'no-store' })
+    const result = await response.json().catch(() => null)
+    if (!response.ok || !result) { setErrorText('Не удалось сравнить месяц со справочником.'); return }
+    if (result.version !== versionRef.current) { setErrorText('План изменился на сервере. Обновите страницу.'); return }
+    setErrorText('')
+    setSync(result.changes as TemplateChange[])
+  }
+
+  function applySync(selected: TemplateChange[]) {
+    // Changes arrive in grosz; the edited plan goes through the regular autosave with its version check.
+    setPlan((current) => toUiPlan(applyTemplateChanges(toApiPlan(current), selected)))
+    setSync(null)
   }
 
   async function resetPayment(paymentId: string) {
@@ -188,7 +208,8 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
       <main>
         {errorText && <div className="warning" role="alert"><ShieldCheck /><span>{errorText} {saveState === 'error' && <button onClick={() => { setSaveState('saving'); void persist(planRef.current) }}>Повторить</button>}</span></div>}
         {conflict && <div className="warning" role="alert"><ShieldCheck /><div><strong>План изменён другим пользователем</strong><span>Ваши изменения остались на экране. Версия на сервере: {money(conflict.summary.freeAfterPlan / 100)} свободно, обновлена {new Date(conflict.updatedAt).toLocaleString('ru-RU')}.</span><button onClick={() => { versionRef.current = conflict.version; setConflict(null); void persist(planRef.current) }}>Сохранить мои изменения поверх новой версии</button><button onClick={() => applyRecord(conflict)}>Загрузить версию с сервера</button></div></div>}
-        <div className="plan-meta"><span>{status === 'Finalized' ? 'Зафиксирован' : 'Черновик'} · {lastSaved.by}, {new Date(lastSaved.at).toLocaleString('ru-RU')}</span><button className="secondary-button" onClick={() => void changeStatus(status === 'Draft' ? 'finalize' : 'reopen')}>{status === 'Draft' ? 'Зафиксировать' : 'Вернуть к редактированию'}</button></div>
+        <div className="plan-meta"><span>{status === 'Finalized' ? 'Зафиксирован' : 'Черновик'} · {lastSaved.by}, {new Date(lastSaved.at).toLocaleString('ru-RU')}</span><div className="plan-meta-actions">{status === 'Draft' && <button className="secondary-button" onClick={() => void openSync()}>Обновить из справочника</button>}<button className="secondary-button" onClick={() => void changeStatus(status === 'Draft' ? 'finalize' : 'reopen')}>{status === 'Draft' ? 'Зафиксировать' : 'Вернуть к редактированию'}</button></div></div>
+        {sync && status === 'Draft' && <TemplateSync changes={sync} accounts={plan.accounts} onApply={applySync} onClose={() => setSync(null)} />}
         <fieldset className="plan-fieldset" disabled={status === 'Finalized'}>
         {view === 'overview' && <Overview plan={plan} setPlan={setPlan} summary={summary} accountName={accountName} onNextMonth={() => { const [year, month] = plan.month.split('-').map(Number); const next = new Date(year, month, 1); void selectMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`) }} />}
         {view === 'income' && <LedgerPage title="Источники дохода" subtitle="Все ожидаемые поступления месяца — независимо от того, кто и на какой счёт их получает." action="Добавить доход" onAdd={() => setAddIncome(true)}>

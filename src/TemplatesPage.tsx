@@ -50,7 +50,7 @@ export default function TemplatesPage({ accounts, month, csrfToken }: { accounts
         body: JSON.stringify({ name: name.trim(), defaultAmount: toCents(Number(amount.replace(',', '.'))), accountId, day: day && !weekly ? Number(day) : null, activeFrom: `${effectiveMonth}-01`, activeTo: null, categoryId: kind === 'payment' && categoryId ? categoryId : null, ...(kind === 'payment' ? { schedule: weekly ? 'weekly' : 'monthly', weekdays: weekly ? weekdays : null } : {}) }),
       })
       if (!response.ok) throw new Error('Не удалось создать шаблон')
-      setName(''); setAmount('0'); setDay(''); setWeekdays([]); setMessage('Добавлено в справочник. Появится в месяцах, которые будут созданы начиная с выбранного. Уже открытые месяцы не меняются: туда платёж можно добавить на странице «Платежи».')
+      setName(''); setAmount('0'); setDay(''); setWeekdays([]); setMessage('Добавлено в справочник. Появится в месяцах, которые будут созданы начиная с выбранного. Уже созданные месяцы не меняются: чтобы перенести его туда, нажмите «Обновить из справочника» в нужном месяце.')
       await refresh()
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Ошибка') }
   }
@@ -118,7 +118,7 @@ function TemplateRow({ item, kind, accounts, categories, csrfToken, onSaved, onM
         body: JSON.stringify({ name: name.trim(), defaultAmount: toCents(Number(amount.replace(',', '.'))), accountId, day: day && !weekly ? Number(day) : null, activeFrom: `${effectiveMonth}-01`, activeTo: activeTo || null, categoryId: kind === 'payment' && categoryId ? categoryId : null, version: item.version, ...(kind === 'payment' ? { schedule: weekly ? 'weekly' : 'monthly', weekdays: weekly ? weekdays : null } : {}) }),
       })
       if (!response.ok) throw new Error(response.status === 409 ? 'Шаблон изменился у другого пользователя. Ваш ввод остался на экране; обновите список для сравнения.' : 'Не удалось сохранить шаблон')
-      onMessage('Базовое значение сохранено. Созданные месяцы не изменены.')
+      onMessage('Сохранено. Уже созданные месяцы не изменены — их можно обновить кнопкой «Обновить из справочника».')
       await onSaved()
     } catch (error) { onMessage(error instanceof Error ? error.message : 'Ошибка') }
   }

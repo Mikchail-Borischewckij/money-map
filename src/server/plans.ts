@@ -3,6 +3,7 @@ import type { Session } from './auth'
 import { calculateMoneyPlan, type MoneyPlan } from './money'
 import { planInput } from './validation'
 import { countWeekdays } from '../schedule'
+import { templateChanges, type IncomeTemplate, type PaymentTemplate } from './template-sync'
 
 const monthText = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 const dayInMonth = (year: number, month: number, day: number | null) => day ? `${monthText(year, month)}-${String(Math.min(day, new Date(Date.UTC(year, month, 0)).getUTCDate())).padStart(2, '0')}` : null
@@ -17,6 +18,32 @@ function paymentSnapshot(year: number, month: number, template: PaymentTemplateR
     return { amount: unitPrice * quantity, unitPrice, quantity, weekdays: template.weekdays, dueDate: null }
   }
   return { amount: Number(template.default_amount), unitPrice: null, quantity: null, weekdays: null, dueDate: dayInMonth(year, month, template.due_day) }
+}
+
+type Sql = ReturnType<typeof db>
+
+// Templates in force on the first day of the month, on accounts that are still open. Used both to create a month and to compare it with the directory.
+async function activeTemplates(sql: Sql, householdId: string, first: string) {
+  const [incomes, payments] = await Promise.all([
+    sql`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day
+      FROM recurring_incomes i JOIN income_template_versions v ON v.recurring_income_id = i.id
+      JOIN accounts a ON a.id = v.account_id
+      WHERE i.household_id = ${householdId} AND i.is_archived = false AND a.is_archived = false
+      AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
+      AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)
+      ORDER BY i.created_at, i.id`,
+    sql`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, COALESCE(c.name, '') AS category
+      FROM recurring_payments p JOIN payment_template_versions v ON v.recurring_payment_id = p.id
+      JOIN accounts a ON a.id = v.account_id LEFT JOIN categories c ON c.id = v.category_id
+      WHERE p.household_id = ${householdId} AND p.is_archived = false AND a.is_archived = false
+      AND p.active_from <= ${first}::date AND (p.active_to IS NULL OR p.active_to >= ${first}::date)
+      AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)
+      ORDER BY p.created_at, p.id`,
+  ])
+  return {
+    incomes: incomes.map((row): IncomeTemplate => ({ id: row.id, name: row.name, accountId: row.account_id, amount: Number(row.default_amount), day: row.expected_day })),
+    payments: payments.map((row): PaymentTemplate => ({ id: row.id, name: row.name, category: row.category, accountId: row.account_id, amount: Number(row.default_amount), day: row.due_day, schedule: row.schedule, weekdays: row.weekdays })),
+  }
 }
 
 export async function listPlans(session: Session) {
@@ -44,26 +71,15 @@ export async function createPlan(session: Session, year: number, month: number) 
       (monthly_plan_id, account_id, amount, is_confirmed, name_snapshot, type_snapshot, can_fund_transfers_snapshot, transfer_priority_snapshot)
       SELECT ${planId}, id, 0, false, name, type, can_fund_transfers, transfer_priority
       FROM accounts WHERE household_id = ${session.householdId} AND is_archived = false`
-    const incomes = await tx`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day
-      FROM recurring_incomes i JOIN income_template_versions v ON v.recurring_income_id = i.id
-      JOIN accounts a ON a.id = v.account_id
-      WHERE i.household_id = ${session.householdId} AND i.is_archived = false AND a.is_archived = false
-      AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
-      AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
-    const payments = await tx`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, COALESCE(c.name, '') AS category
-      FROM recurring_payments p JOIN payment_template_versions v ON v.recurring_payment_id = p.id
-      JOIN accounts a ON a.id = v.account_id LEFT JOIN categories c ON c.id = v.category_id
-      WHERE p.household_id = ${session.householdId} AND p.is_archived = false AND a.is_archived = false
-      AND p.active_from <= ${first}::date AND (p.active_to IS NULL OR p.active_to >= ${first}::date)
-      AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
+    const { incomes, payments } = await activeTemplates(tx as unknown as Sql, session.householdId, first)
     for (const income of incomes) await tx`INSERT INTO monthly_incomes
       (monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date)
-      VALUES (${planId}, ${income.id}, ${income.name}, ${income.default_amount}, ${income.account_id}, ${dayInMonth(year, month, income.expected_day)})`
+      VALUES (${planId}, ${income.id}, ${income.name}, ${income.amount}, ${income.accountId}, ${dayInMonth(year, month, income.day)})`
     for (const payment of payments) {
-      const snapshot = paymentSnapshot(year, month, payment as unknown as PaymentTemplateRow)
+      const snapshot = paymentSnapshot(year, month, { default_amount: payment.amount, due_day: payment.day, schedule: payment.schedule, weekdays: payment.weekdays })
       await tx`INSERT INTO monthly_payments
         (monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, schedule_snapshot, weekdays_snapshot, unit_price, quantity)
-        VALUES (${planId}, ${payment.id}, ${payment.name}, ${payment.category}, ${snapshot.amount}, ${payment.account_id}, ${snapshot.dueDate},
+        VALUES (${planId}, ${payment.id}, ${payment.name}, ${payment.category}, ${snapshot.amount}, ${payment.accountId}, ${snapshot.dueDate},
           ${payment.schedule}, ${intArray(snapshot.weekdays)}::integer[], ${snapshot.unitPrice}, ${snapshot.quantity})`
     }
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
@@ -111,6 +127,15 @@ export async function readPlan(session: Session, id: string) {
     allocations: allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, amount: Number(allocation.amount), accountId: allocation.account_id, kind: allocation.type })),
   }
   return { id: record.id as string, version: record.version as number, status: record.status as 'Draft' | 'Finalized', updatedAt: record.updated_at, updatedBy: record.updated_by_name, balanceDate: record.balance_date, plan, summary: calculateMoneyPlan(plan) }
+}
+
+// Preview of what "update from directory" would change in a draft month. The client applies the chosen items and saves the plan as usual.
+export async function planTemplateChanges(session: Session, id: string) {
+  const record = await readPlan(session, id)
+  if (!record) return { result: 'missing' as const }
+  if (record.status !== 'Draft') return { result: 'finalized' as const }
+  const templates = await activeTemplates(db(), session.householdId, `${record.plan.month}-01`)
+  return { result: 'ok' as const, version: record.version, changes: templateChanges(record.plan.month, record.plan, templates) }
 }
 
 export async function readPlanByMonth(session: Session, year: number, month: number) {

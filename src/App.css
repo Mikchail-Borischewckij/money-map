@@ -26,3 +26,4 @@
 
 .form-note{margin:0;color:#66717d;font-size:12px;}
 .link-button{border:0;background:none;padding:0;color:#315c49;font:inherit;text-decoration:underline}
+.plan-meta-actions{display:flex;gap:8px;flex-wrap:wrap}.template-sync{padding:0 20px 20px;margin-bottom:16px}.sync-group{padding:14px 0;border-bottom:1px solid #edf0f2}.sync-group h3{font-size:14px;margin:0 0 8px}.sync-group h3 small{display:block;font-size:11px;font-weight:400;color:#848d96;margin-top:3px}.sync-item{display:flex;gap:10px;align-items:flex-start;padding:8px 0;cursor:pointer}.sync-item input{margin-top:3px;accent-color:#285d47;width:16px;height:16px}.sync-item strong,.sync-item small{display:block}.sync-item strong{font-size:13px}.sync-item small{font-size:12px;color:#63707a;margin-top:3px}.sync-fields{display:block}.template-sync .form-actions{padding-top:16px}
