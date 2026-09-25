@@ -9,6 +9,14 @@ afterEach(() => {
 })
 
 describe('server authorization rules', () => {
+  it('allows one account while the second slot is still empty', () => {
+    process.env.ALLOWED_GOOGLE_EMAIL_1 = 'owner@gmail.com'
+    process.env.ALLOWED_GOOGLE_EMAIL_2 = ''
+    expect(allowedEmails()).toEqual(['owner@gmail.com'])
+    expect(canUseGoogleIdentity('owner@gmail.com', true)).toBe(true)
+    expect(canUseGoogleIdentity('stranger@gmail.com', true)).toBe(false)
+  })
+
   it('binds only two verified Google emails, then authorizes their existing subjects', () => {
     process.env.ALLOWED_GOOGLE_EMAIL_1 = 'First@Gmail.com'
     process.env.ALLOWED_GOOGLE_EMAIL_2 = 'second@company.example'

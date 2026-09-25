@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { allowedEmails, randomToken } from '@/server/auth'
 
 export async function GET() {
-  if (allowedEmails().length !== 2 || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.APP_ORIGIN || !process.env.DATABASE_URL) {
+  if (allowedEmails().length === 0 || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.APP_ORIGIN || !process.env.DATABASE_URL) {
     return new Response('Authentication is not configured', { status: 503 })
   }
   const state = randomToken()

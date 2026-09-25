@@ -16,13 +16,13 @@ export type Session = {
 export function allowedEmails() {
   const emails = [process.env.ALLOWED_GOOGLE_EMAIL_1, process.env.ALLOWED_GOOGLE_EMAIL_2]
     .map((value) => value?.trim().toLowerCase())
-    .filter((value): value is string => Boolean(value && value.includes('@')))
-  return emails.length === 2 && emails[0] !== emails[1] ? emails : []
+    .filter((value): value is string => Boolean(value))
+  return emails.length > 0 && emails.every((value) => value.includes('@')) && new Set(emails).size === emails.length ? emails : []
 }
 
 export function canUseGoogleIdentity(email: string, emailVerified: boolean, hostedDomain?: string, boundInitialEmail?: string) {
   const allowlist = allowedEmails()
-  if (allowlist.length !== 2) return false
+  if (allowlist.length === 0) return false
   if (boundInitialEmail) return allowlist.includes(boundInitialEmail)
   const normalized = email.trim().toLowerCase()
   const domain = normalized.split('@')[1]
@@ -35,7 +35,7 @@ export function hashToken(token: string) { return createHash('sha256').update(to
 
 export async function getSession(): Promise<Session | null> {
   const token = (await cookies()).get(sessionCookie)?.value
-  if (!token || allowedEmails().length !== 2 || !process.env.DATABASE_URL) return null
+  if (!token || allowedEmails().length === 0 || !process.env.DATABASE_URL) return null
   const tokenHash = hashToken(token)
   const rows = await db()`
     SELECT u.id AS user_id, u.household_id, u.google_subject, u.initial_email, u.display_name, s.csrf_token
