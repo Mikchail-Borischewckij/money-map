@@ -3,7 +3,7 @@ import type { Session } from './auth'
 import { calculateMoneyPlan, type MoneyPlan } from './money'
 import { planInput } from './validation'
 import { countWeekdays } from '../lib/schedule'
-import { templateChanges, type IncomeTemplate, type PaymentTemplate } from '../lib/template-sync'
+import type { IncomeTemplate, PaymentTemplate } from '../lib/month-merge'
 
 const monthText = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 const dayInMonth = (year: number, month: number, day: number | null) => day ? `${monthText(year, month)}-${String(Math.min(day, new Date(Date.UTC(year, month, 0)).getUTCDate())).padStart(2, '0')}` : null
@@ -167,15 +167,6 @@ export async function readPlan(session: Session, id: string) {
     allocations: allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, amount: Number(allocation.amount), accountId: allocation.account_id, kind: allocation.type })),
   }
   return { id: record.id as string, version: record.version as number, status: record.status as 'Draft' | 'Finalized', updatedAt: record.updated_at, updatedBy: record.updated_by_name, balanceDate: record.balance_date, plan, summary: calculateMoneyPlan(plan) }
-}
-
-// Preview of what "update from directory" would change in a draft month. The client applies the chosen items and saves the plan as usual.
-export async function planTemplateChanges(session: Session, id: string) {
-  const record = await readPlan(session, id)
-  if (!record) return { result: 'missing' as const }
-  if (record.status !== 'Draft') return { result: 'finalized' as const }
-  const templates = await activeTemplates(db(), session.householdId, `${record.plan.month}-01`)
-  return { result: 'ok' as const, version: record.version, changes: templateChanges(record.plan.month, record.plan, templates) }
 }
 
 export async function savePlan(session: Session, id: string, value: unknown) {

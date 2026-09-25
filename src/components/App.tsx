@@ -38,7 +38,7 @@ export default function App({ initial, nextMonth, csrfToken, displayName }: { in
       </div>}
       {view === 'month' && <MonthPage month={month} categories={categories} onOpenSettings={() => setView('settings')} />}
       {view === 'history' && <HistoryPage />}
-      {view === 'settings' && <SettingsPage csrfToken={csrfToken} openMonth={month.open ? month.plan.month : null} onChanged={() => { void loadCategories(); month.refreshAfterSettings() }} />}
+      {view === 'settings' && <SettingsPage csrfToken={csrfToken} onChanged={() => { void loadCategories(); month.refreshAfterSettings() }} />}
     </main>
     <TabBar view={view} onNavigate={setView} />
   </div>

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toApiPlan, toUiPlan, toUiSummary, type ServerRecord } from '@/lib/api-client'
 import { calculatePlan, type Plan } from '@/lib/domain'
-import { applyTemplateChanges, type TemplateChange } from '@/lib/template-sync'
 
 export type SaveState = 'saved' | 'saving' | 'error' | 'conflict'
 
@@ -20,8 +19,6 @@ export function useMonthPlan({ initial, initialNext, csrfToken }: { initial: Ser
   const [saveState, setSaveState] = useState<SaveState>('saved')
   const [conflict, setConflict] = useState<ServerRecord | null>(null)
   const [errorText, setErrorText] = useState('')
-  const [sync, setSync] = useState<TemplateChange[] | null>(null)
-  const [pendingChanges, setPendingChanges] = useState(0)
   const versionRef = useRef(initial.version)
   const savingRef = useRef(false)
   const planRef = useRef(plan)
@@ -75,20 +72,11 @@ export function useMonthPlan({ initial, initialNext, csrfToken }: { initial: Ser
     setStatus(record.status)
     setServerSummary(toUiSummary(record.summary))
     setConflict(null)
-    setSync(null)
     setSaveState('saved')
     setPlan(value)
     setSavedPlan(value)
     if (next !== undefined) setNextMonth(next)
   }
-
-  // How many settings changes the open month does not have yet; shown as a hint above the month.
-  const checkPending = useCallback(async (id: string) => {
-    const response = await fetch(`/api/plans/${id}/template-changes`, { cache: 'no-store' }).catch(() => null)
-    const result = response?.ok ? await response.json() : null
-    setPendingChanges(result ? result.changes.length : 0)
-  }, [])
-  useEffect(() => { if (status === 'Draft') void checkPending(recordId) }, [status, recordId, checkPending])
 
   const busy = () => { if (dirty || savingRef.current) { setErrorText('Подождите, изменения сохраняются.'); return true } return false }
 
@@ -97,18 +85,16 @@ export function useMonthPlan({ initial, initialNext, csrfToken }: { initial: Ser
     if (!response.ok) { setErrorText('Не удалось загрузить месяц.'); return }
     const { record, next } = await response.json() as { record: ServerRecord; next: string | null }
     applyRecord(record, next)
-    if (record.status === 'Draft') void checkPending(record.id)
   }
 
   return {
-    plan, summary, open, dirty, nextMonth, saveState, conflict, errorText, sync,
-    pendingChanges: open ? pendingChanges : 0,
+    plan, summary, open, dirty, nextMonth, saveState, conflict, errorText,
     update: (change: (plan: Plan) => Plan) => { if (open) setPlan((current) => change(current)) },
     clearError: () => setErrorText(''),
     retrySave: () => { setSaveState('saving'); void persist(planRef.current) },
     keepMine: () => { if (!conflict) return; versionRef.current = conflict.version; setConflict(null); void persist(planRef.current) },
     loadServer: () => { if (conflict) applyRecord(conflict) },
-    // After a settings change the open month reloads so a new account shows up at once; unsaved edits are never dropped.
+    // Settings changes are written into the open month on the server; reload it so they show at once. Unsaved edits are never dropped.
     refreshAfterSettings: () => { if (!dirty && !savingRef.current) void reloadCurrent() },
 
     async closeMonth() {
@@ -129,22 +115,6 @@ export function useMonthPlan({ initial, initialNext, csrfToken }: { initial: Ser
       applyRecord(await response.json() as ServerRecord, null)
       setErrorText('')
     },
-    async openSync() {
-      if (busy()) return
-      const response = await fetch(`/api/plans/${recordId}/template-changes`, { cache: 'no-store' })
-      const result = await response.json().catch(() => null)
-      if (!response.ok || !result) { setErrorText('Не удалось сравнить с настройками.'); return }
-      if (result.version !== versionRef.current) { setErrorText('Месяц изменился. Обновите страницу.'); return }
-      setErrorText('')
-      setSync(result.changes as TemplateChange[])
-    },
-    // Changes arrive in grosz; the edited month then goes through the regular autosave.
-    applySync(selected: TemplateChange[]) {
-      setPlan((current) => toUiPlan(applyTemplateChanges(toApiPlan(current), selected)))
-      setSync(null)
-      setPendingChanges(0)
-    },
-    closeSync: () => setSync(null),
     async reset(kind: 'payments' | 'incomes', id: string) {
       if (busy()) return
       const response = await post(`/api/plans/${recordId}/${kind}/${id}/reset`, csrfToken, { expectedVersion: versionRef.current })

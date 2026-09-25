@@ -1,0 +1,62 @@
+import { describe, expect, it } from 'vitest'
+import type { MoneyIncome } from '../server/money'
+import { mergeIncome, mergePayment, paymentFromTemplate, type IncomeTemplate, type PaymentTemplate } from './month-merge'
+
+const month = '2026-10'
+const rent: PaymentTemplate = { id: 'rent', name: 'Аренда', category: 'Жильё', accountId: 'main', amount: 350000, day: 10, schedule: 'monthly', weekdays: null }
+const pool: PaymentTemplate = { id: 'pool', name: 'Бассейн', category: 'Спорт', accountId: 'main', amount: 7000, day: null, schedule: 'weekly', weekdays: [1, 4] }
+const salary: IncomeTemplate = { id: 'salary', name: 'Зарплата', accountId: 'main', amount: 900000, day: 10 }
+const salaryRow: MoneyIncome = { id: 'i1', recurringIncomeId: 'salary', name: 'Зарплата', amount: 900000, accountId: 'main', expectedOn: '2026-10-10', enabled: true, status: 'expected' }
+
+describe('settings changes in the open month', () => {
+  it('adds a new payment with the calendar count', () => {
+    const { value, kept } = mergePayment(month, null, null, pool, () => 'new')
+    expect(value).toMatchObject({ id: 'new', recurringPaymentId: 'pool', quantity: 9, amount: 63000, enabled: true })
+    expect(kept).toEqual([])
+  })
+
+  it('follows a new price while the month still has the old one', () => {
+    const row = paymentFromTemplate(month, rent, 'p1')
+    const { value, kept } = mergePayment(month, row, rent, { ...rent, amount: 370000, accountId: 'second' })
+    expect(value).toMatchObject({ id: 'p1', amount: 370000, accountId: 'second' })
+    expect(kept).toEqual([])
+  })
+
+  it('keeps an amount changed in the month and still takes the other fields', () => {
+    const row = { ...paymentFromTemplate(month, rent, 'p1'), amount: 300000 }
+    const { value, kept } = mergePayment(month, row, rent, { ...rent, amount: 370000, accountId: 'second' })
+    expect(value).toMatchObject({ amount: 300000, accountId: 'second' })
+    expect(kept).toEqual(['сумма'])
+  })
+
+  it('keeps a corrected count, takes a new price and recomputes the total', () => {
+    const row = { ...paymentFromTemplate(month, pool, 'p2'), quantity: 6, amount: 42000 }
+    const { value, kept } = mergePayment(month, row, pool, { ...pool, amount: 8000 })
+    expect(value).toMatchObject({ quantity: 6, unitPrice: 8000, amount: 48000 })
+    expect(kept).toEqual(['количество'])
+  })
+
+  it('recounts when the weekdays change', () => {
+    const row = { ...paymentFromTemplate(month, pool, 'p2'), quantity: 6, amount: 42000 }
+    const { value } = mergePayment(month, row, pool, { ...pool, weekdays: [2] })
+    expect(value).toMatchObject({ weekdays: [2], quantity: 4, amount: 28000 })
+  })
+
+  it('keeps an exclusion and its reason', () => {
+    const row = { ...paymentFromTemplate(month, rent, 'p1'), enabled: false, exclusionReason: 'уже оплачено' }
+    const { value } = mergePayment(month, row, rent, { ...rent, amount: 370000 })
+    expect(value).toMatchObject({ enabled: false, exclusionReason: 'уже оплачено', amount: 370000 })
+  })
+
+  it('switches a monthly payment to weekly', () => {
+    const row = paymentFromTemplate(month, { ...pool, schedule: 'monthly', weekdays: null, amount: 50000 }, 'p3')
+    const { value } = mergePayment(month, row, { ...pool, schedule: 'monthly', weekdays: null, amount: 50000 }, pool)
+    expect(value).toMatchObject({ schedule: 'weekly', quantity: 9, unitPrice: 7000, amount: 63000, due: 'в течение месяца' })
+  })
+
+  it('updates income but keeps its status and an amount changed in the month', () => {
+    const { value, kept } = mergeIncome(month, { ...salaryRow, status: 'included', amount: 950000 }, salary, { ...salary, amount: 1000000, day: 31 })
+    expect(value).toMatchObject({ amount: 950000, expectedOn: '2026-10-31', status: 'included' })
+    expect(kept).toEqual(['сумма'])
+  })
+})

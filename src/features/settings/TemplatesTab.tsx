@@ -10,10 +10,10 @@ import { send } from './api'
 import TemplateDialog from './TemplateDialog'
 import type { AccountRow, Category, Run, Template, TemplateForm, TemplateKind } from './types'
 
-const scheduleText = (item: Template) => item.schedule === 'weekly' && item.weekdays ? weekdayLabel(item.weekdays) : item.day ? `${item.day}-е число` : 'Каждый месяц'
+const scheduleText = (item: Template) => item.schedule === 'weekly' && item.weekdays ? weekdayLabel(item.weekdays) : item.day ? `${item.day}‑е число` : 'Каждый месяц'
 const formOf = (item: Template): TemplateForm => ({ name: item.name, amount: Number(item.default_amount) / 100, accountId: item.account_id, day: item.day, categoryId: item.category_id ?? '', schedule: item.schedule ?? 'monthly', weekdays: item.weekdays ?? [] })
 
-export default function TemplatesTab({ kind, items, accounts, categories, csrfToken, run, hint }: { kind: TemplateKind; items: Template[]; accounts: AccountRow[]; categories: Category[]; csrfToken: string; run: Run; hint: string }) {
+export default function TemplatesTab({ kind, items, accounts, categories, csrfToken, run }: { kind: TemplateKind; items: Template[]; accounts: AccountRow[]; categories: Category[]; csrfToken: string; run: Run }) {
   const [editing, setEditing] = useState<Template | 'new' | null>(null)
   const [showEnded, setShowEnded] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
@@ -39,10 +39,10 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
       <div className="row-side">
         <strong className="amount">{item.schedule === 'weekly' ? `${money(amount)} за раз` : money(amount)}</strong>
         <RowMenu label={`Действия: ${item.name}`} items={isPast || lastMonth
-          ? [{ label: 'Снова нужен', onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, false)), `Снова действует.${hint}`) }]
+          ? [{ label: 'Снова нужен', onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, false)), 'Снова действует.') }]
           : [
             { label: 'Изменить', onSelect: () => setEditing(item) },
-            { label: 'Больше не нужен', danger: true, onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, true)), 'Готово. В следующие месяцы не попадёт.') },
+            { label: 'Больше не нужен', danger: true, onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, true)), 'Готово. В этом месяце остаётся, в следующие не попадёт.') },
           ]} />
       </div>
     </div>
@@ -51,11 +51,11 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
   const save = (value: TemplateForm) => {
     const target = editing === 'new' ? null : editing
     setEditing(null)
-    void run(() => target ? send(`${url}/${target.id}`, 'PUT', csrfToken, payload(value, target.version)) : send(url, 'POST', csrfToken, payload(value)), `${target ? 'Сохранено.' : 'Добавлено.'}${hint}`)
+    void run(() => target ? send(`${url}/${target.id}`, 'PUT', csrfToken, payload(value, target.version)) : send(url, 'POST', csrfToken, payload(value)), target ? 'Сохранено.' : 'Добавлено.')
   }
 
   return <section className="card">
-    <header className="card-head"><div><h2>{kind === 'payment' ? 'Регулярные платежи' : 'Регулярные доходы'}</h2><p className="muted">Из них собирается каждый новый месяц. Закрытые месяцы не меняются.</p></div>
+    <header className="card-head"><div><h2>{kind === 'payment' ? 'Регулярные платежи' : 'Регулярные доходы'}</h2><p className="muted">Действуют с открытого месяца. Закрытые месяцы не меняются.</p></div>
       <Button variant="primary" icon={<Plus size={16} />} disabled={noAccounts} onClick={() => setEditing('new')}>{kind === 'payment' ? 'Платёж' : 'Доход'}</Button></header>
     {noAccounts && <Empty>Сначала добавьте счёт.</Empty>}
     {current.length === 0 && !noAccounts && <Empty>Пока пусто.</Empty>}

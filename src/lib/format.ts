@@ -8,4 +8,4 @@ export function monthName(value: string, withYear = true) {
 
 export const cx = (...names: (string | false | null | undefined)[]) => names.filter(Boolean).join(' ')
 
-export const dayOptions = [{ value: '', label: 'Любой день' }, ...Array.from({ length: 31 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}-е число` }))]
+export const dayOptions = [{ value: '', label: 'Любой день' }, ...Array.from({ length: 31 }, (_, index) => ({ value: String(index + 1), label: `${index + 1}‑е число` }))]

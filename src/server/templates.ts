@@ -1,6 +1,9 @@
 import type { Session } from './auth'
 import { db, intArray } from './db'
 import { calendarMonth, monthToStart } from './plans'
+import { applyToOpenMonth, lockOpenPlan, templateAt } from './open-month'
+
+type Sql = ReturnType<typeof db>
 
 export type TemplateKind = 'income' | 'payment'
 export type TemplateValue = {
@@ -61,7 +64,9 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
   const window = await settingsWindow(session)
   const value = { ...input, activeFrom: window.effectiveFrom, activeTo: input.ended ? window.endDate : null }
   if (value.activeTo && value.activeTo < value.activeFrom) return null
-  return db().begin(async (tx) => {
+  return db().begin(async (transaction) => {
+    const tx = transaction as unknown as Sql
+    const plan = await lockOpenPlan(tx, session.householdId)
     if (kind === 'income') {
       const rows = await tx`INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, expected_day, active_from, active_to)
         VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.activeFrom}, ${value.activeTo}) RETURNING *`
@@ -69,7 +74,7 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
         VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
       await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
         VALUES (${session.householdId}, ${session.userId}, 'RecurringIncome', ${rows[0].id}, 'create', 1)`
-      return rows[0]
+      return { ...rows[0], monthNote: await applyToOpenMonth(tx, session, kind, rows[0].id, plan, null) }
     }
     const schedule = value.schedule ?? 'monthly'
     const weekdays = intArray(value.weekdays)
@@ -79,7 +84,7 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
       VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${schedule}, ${weekdays}::integer[])`
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'RecurringPayment', ${rows[0].id}, 'create', 1)`
-    return rows[0]
+    return { ...rows[0], monthNote: await applyToOpenMonth(tx, session, kind, rows[0].id, plan, null) }
   })
 }
 
@@ -87,11 +92,14 @@ export async function updateTemplate(session: Session, kind: TemplateKind, id: s
   const version = input.version
   if (!version || !await referencesValid(session, input)) return null
   const window = await settingsWindow(session)
-  return db().begin(async (tx) => {
+  return db().begin(async (transaction) => {
+    const tx = transaction as unknown as Sql
+    const plan = await lockOpenPlan(tx, session.householdId)
     const current = kind === 'income'
       ? await tx`SELECT version, active_from::text, active_to::text FROM recurring_incomes WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`
       : await tx`SELECT version, active_from::text, active_to::text FROM recurring_payments WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`
     if (!current[0] || current[0].version !== version) return null
+    const before = plan ? await templateAt(tx, kind, id, plan) : null
     // An already ended template keeps its original end, so editing it never brings it back into months in between.
     const value = { ...input, activeFrom: window.effectiveFrom, activeTo: input.ended ? current[0].active_to ?? window.endDate : null }
     if (value.activeTo && value.activeTo < current[0].active_from) return null
@@ -115,7 +123,7 @@ export async function updateTemplate(session: Session, kind: TemplateKind, id: s
         version = version + 1, updated_at = now() WHERE id = ${id} RETURNING *`
       await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
         VALUES (${session.householdId}, ${session.userId}, 'RecurringIncome', ${id}, 'update', ${version}, ${version + 1})`
-      return rows[0]
+      return { ...rows[0], monthNote: await applyToOpenMonth(tx, session, kind, id, plan, before) }
     }
     const schedule = value.schedule ?? 'monthly'
     const weekdays = intArray(value.weekdays)
@@ -134,6 +142,6 @@ export async function updateTemplate(session: Session, kind: TemplateKind, id: s
       active_to = ${value.activeTo}, version = version + 1, updated_at = now() WHERE id = ${id} RETURNING *`
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'RecurringPayment', ${id}, 'update', ${version}, ${version + 1})`
-    return rows[0]
+    return { ...rows[0], monthNote: await applyToOpenMonth(tx, session, kind, id, plan, before) }
   })
 }

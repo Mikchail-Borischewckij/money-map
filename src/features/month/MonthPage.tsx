@@ -1,12 +1,10 @@
 "use client"
 
 import { useState } from 'react'
-import { RefreshCw } from 'lucide-react'
 import { Badge, Button, Dialog } from '@/components/ui'
 import type { MonthPlanState } from '@/hooks/useMonthPlan'
 import { money, monthName } from '@/lib/format'
 import MonthView from './MonthView'
-import TemplateSync from './TemplateSync'
 
 export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: string[]; onOpenSettings: () => void }) {
   const [confirmClose, setConfirmClose] = useState(false)
@@ -40,13 +38,7 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
         <Badge tone={open ? 'blue' : 'neutral'}>{open ? 'Открыт' : 'Закрыт'}</Badge>
         {open && <span className="save-state" aria-live="polite">{saveText}</span>}
       </div>
-      {open && liveAccounts.length > 0 && <Button icon={<RefreshCw size={16} />} onClick={() => void month.openSync()}>Обновить из настроек</Button>}
     </header>
-    {open && !month.sync && month.pendingChanges > 0 && <div className="card notice">
-      <span>В настройках есть изменения, которых нет в этом месяце: {month.pendingChanges}.</span>
-      <Button size="sm" variant="primary" onClick={() => void month.openSync()}>Посмотреть</Button>
-    </div>}
-    {month.sync && open && <TemplateSync changes={month.sync} accounts={plan.accounts} onApply={month.applySync} onClose={month.closeSync} />}
     {open && liveAccounts.length === 0 ? <div className="card onboarding">
       <h2>Начните с настроек</h2>
       <ol><li>Добавьте счета.</li><li>Добавьте регулярные доходы и платежи.</li><li>Вернитесь сюда — месяц соберётся из настроек.</li></ol>

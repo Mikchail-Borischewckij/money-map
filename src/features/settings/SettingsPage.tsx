@@ -10,7 +10,7 @@ import type { AccountRow, Category, Template } from './types'
 type Tab = 'accounts' | 'payments' | 'incomes' | 'categories'
 const tabs: Option<Tab>[] = [{ value: 'accounts', label: 'Счета' }, { value: 'payments', label: 'Платежи' }, { value: 'incomes', label: 'Доходы' }, { value: 'categories', label: 'Категории' }]
 
-export default function SettingsPage({ csrfToken, openMonth, onChanged }: { csrfToken: string; openMonth: string | null; onChanged: () => void }) {
+export default function SettingsPage({ csrfToken, onChanged }: { csrfToken: string; onChanged: () => void }) {
   const [tab, setTab] = useState<Tab>('accounts')
   const [accounts, setAccounts] = useState<AccountRow[]>([])
   const [templates, setTemplates] = useState<{ payments: Template[]; incomes: Template[] }>({ payments: [], incomes: [] })
@@ -26,12 +26,15 @@ export default function SettingsPage({ csrfToken, openMonth, onChanged }: { csrf
   }, [])
   useEffect(() => { refresh().catch((failure: Error) => setError(failure.message)) }, [refresh])
 
-  // Every change reloads the lists; the open month is told so it can show a new account right away.
+  // Every change reloads the lists and the open month; the server has already written the change into it and may return a note.
   const run = async (action: () => Promise<unknown>, done: string) => {
     setError(''); setMessage('')
-    try { await action(); await refresh(); onChanged(); setMessage(done) } catch (failure) { setError(failure instanceof Error ? failure.message : 'Ошибка') }
+    try {
+      const result = await action() as { monthNote?: string } | null
+      await refresh(); onChanged()
+      setMessage([done, result?.monthNote].filter(Boolean).join(' '))
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Ошибка') }
   }
-  const monthHint = openMonth ? ' В открытый месяц — кнопкой «Обновить из настроек».' : ''
 
   return <div className="page">
     <header className="page-head"><h1>Настройки</h1></header>
@@ -39,8 +42,8 @@ export default function SettingsPage({ csrfToken, openMonth, onChanged }: { csrf
     {message && <p className="toast" role="status">{message}</p>}
     {error && <p className="toast toast-error" role="alert">{error}</p>}
     {tab === 'accounts' && <AccountsTab accounts={accounts} csrfToken={csrfToken} run={run} />}
-    {tab === 'payments' && <TemplatesTab kind="payment" items={templates.payments} accounts={accounts} categories={categories} csrfToken={csrfToken} run={run} hint={monthHint} />}
-    {tab === 'incomes' && <TemplatesTab kind="income" items={templates.incomes} accounts={accounts} categories={categories} csrfToken={csrfToken} run={run} hint={monthHint} />}
+    {tab === 'payments' && <TemplatesTab kind="payment" items={templates.payments} accounts={accounts} categories={categories} csrfToken={csrfToken} run={run} />}
+    {tab === 'incomes' && <TemplatesTab kind="income" items={templates.incomes} accounts={accounts} categories={categories} csrfToken={csrfToken} run={run} />}
     {tab === 'categories' && <CategoriesTab categories={categories} csrfToken={csrfToken} run={run} />}
   </div>
 }
