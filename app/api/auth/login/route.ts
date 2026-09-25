@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { allowedSubjects, randomToken } from '@/server/auth'
+import { allowedEmails, randomToken } from '@/server/auth'
 
 export async function GET() {
-  if (allowedSubjects().length !== 2 || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.APP_ORIGIN) {
+  if (allowedEmails().length !== 2 || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.APP_ORIGIN || !process.env.DATABASE_URL) {
     return new Response('Authentication is not configured', { status: 503 })
   }
   const state = randomToken()

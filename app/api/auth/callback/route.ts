@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { allowedSubjects, hashToken, randomToken, sessionCookie } from '@/server/auth'
+import { canUseGoogleIdentity, hashToken, randomToken, sessionCookie } from '@/server/auth'
 import { db } from '@/server/db'
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
   const tokens = await tokenResponse.json() as { id_token?: string }
   if (!tokens.id_token) return NextResponse.redirect(new URL('/?error=login', request.url))
 
-  let identity: { sub: string; email: string; name: string }
+  let identity: { sub: string; email: string; emailVerified: boolean; hostedDomain?: string; name: string }
   try {
     const { payload } = await jwtVerify(tokens.id_token, googleKeys, {
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -47,22 +47,31 @@ export async function GET(request: Request) {
     identity = {
       sub: payload.sub,
       email: typeof payload.email === 'string' ? payload.email : '',
+      emailVerified: payload.email_verified === true,
+      hostedDomain: typeof payload.hd === 'string' ? payload.hd : undefined,
       name: typeof payload.name === 'string' ? payload.name : 'Пользователь',
     }
   } catch {
     return NextResponse.redirect(new URL('/?error=login', request.url))
   }
-  if (!allowedSubjects().includes(identity.sub)) return NextResponse.redirect(new URL('/?error=denied', request.url))
+  const bound = await db()`SELECT id, initial_email, is_active FROM users WHERE google_subject = ${identity.sub}`
+  if (!canUseGoogleIdentity(identity.email, identity.emailVerified, identity.hostedDomain, bound[0]?.initial_email)) {
+    return NextResponse.redirect(new URL('/?error=denied', request.url))
+  }
 
+  const rows = bound.length
+    ? await db()`UPDATE users SET email = ${identity.email}, display_name = ${identity.name}, updated_at = now()
+        WHERE id = ${bound[0].id} AND google_subject = ${identity.sub} RETURNING id, is_active`
+    : await db()`INSERT INTO users (household_id, google_subject, initial_email, email, display_name)
+        SELECT id, ${identity.sub}, ${identity.email.trim().toLowerCase()}, ${identity.email}, ${identity.name}
+        FROM households WHERE singleton = true
+        ON CONFLICT (initial_email) DO UPDATE
+          SET email = EXCLUDED.email, display_name = EXCLUDED.display_name, updated_at = now()
+          WHERE users.google_subject = EXCLUDED.google_subject
+        RETURNING id, is_active`
+  if (!rows[0]?.is_active) return NextResponse.redirect(new URL('/?error=denied', request.url))
   const token = randomToken()
   const csrf = randomToken()
-  const rows = await db()`
-    INSERT INTO users (household_id, google_subject, email, display_name)
-    SELECT id, ${identity.sub}, ${identity.email}, ${identity.name} FROM households WHERE singleton = true
-    ON CONFLICT (google_subject) DO UPDATE SET email = EXCLUDED.email, display_name = EXCLUDED.display_name, updated_at = now()
-    RETURNING id, is_active
-  `
-  if (!rows[0]?.is_active) return NextResponse.redirect(new URL('/?error=denied', request.url))
   await db()`INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at)
     VALUES (${hashToken(token)}, ${rows[0].id}, ${csrf}, now() + interval '30 days')`
   const response = NextResponse.redirect(new URL('/', process.env.APP_ORIGIN))

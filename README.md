@@ -10,7 +10,7 @@
 - Счета, несколько источников дохода, платежи месяца, бюджет жизни и накоплений, переводы и свободный остаток.
 - Независимые месячные планы; при создании месяца копируются действующие версии регулярных доходов и платежей. Остатки не переносятся.
 - Итоговый расчёт выполняется на сервере в целых грошах. В браузере есть только предварительный пересчёт.
-- Google OpenID Connect с проверкой двух разрешённых `sub` на сервере.
+- Google OpenID Connect: два заранее разрешённых адреса используются только для первичной привязки, затем доступ закрепляется за Google `sub` в PostgreSQL.
 - Отзываемые сессии в PostgreSQL; cookie `HttpOnly`, `SameSite=Lax` и `Secure` в production. Для изменяющих запросов проверяются Origin и CSRF-токен.
 - Защита от одновременной перезаписи плана по версии; при конфликте введённые значения остаются на экране.
 - Фиксация и повторное открытие плана, история месяцев, журнал событий, JSON-экспорт.
@@ -22,11 +22,11 @@
 
 1. Установите зависимости: `npm install`.
 2. Запустите PostgreSQL: `docker compose up -d`.
-3. Скопируйте `.env.example` в `.env.local` и заполните Google Client ID, Secret и два разрешённых Google `sub`. Не добавляйте `.env.local` в Git.
+3. Скопируйте `.env.example` в `.env.local` и заполните Google Client ID, Secret и два разрешённых Google-адреса. Не добавляйте `.env.local` в Git.
 4. Примените схему: `npm run db:migrate`.
 5. Запустите приложение: `npm run dev`, затем откройте `http://localhost:3000`.
 
-Google OAuth-клиент должен иметь Redirect URI `http://localhost:3000/api/auth/callback`. Пока секреты и два `sub` не настроены, приложение показывает экран настройки и не открывает финансовые данные.
+Google OAuth-клиент должен иметь Redirect URI `http://localhost:3000/api/auth/callback`. Пока секреты и два адреса не настроены, приложение показывает экран настройки и не открывает финансовые данные.
 
 Проверки: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run build`. Тест миграции выполняется во встроенном PostgreSQL-совместимом движке; перед production миграцию нужно также проверить на отдельной PostgreSQL/Supabase БД.
 
@@ -35,10 +35,10 @@ Google OAuth-клиент должен иметь Redirect URI `http://localhost
 1. Создайте отдельный проект Supabase PostgreSQL для MoneyMap. Схема в `db/migrations/001_initial.sql` закрывает таблицы от ролей `anon` и `authenticated`; браузер не использует ключ Supabase для финансовых данных.
 2. Примените миграцию, используя прямое подключение Supabase к PostgreSQL. Для миграций не используйте transaction pooler. Если прямое подключение недоступно из вашей сети, выполните SQL из миграции в SQL Editor Supabase.
 3. Подключите этот репозиторий к Vercel как Next.js-проект. Статические страницы и серверное `/api` будут на одном домене.
-4. В Vercel Environment Variables задайте `DATABASE_URL` (строка Transaction pooler для serverless-запросов), `DATABASE_SSL=require`, `APP_ORIGIN` (точный production-адрес), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_GOOGLE_SUB_1`, `ALLOWED_GOOGLE_SUB_2`.
+4. В Vercel Environment Variables задайте `DATABASE_URL` (строка Transaction pooler для serverless-запросов), `DATABASE_SSL=require`, `APP_ORIGIN` (точный production-адрес), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_GOOGLE_EMAIL_1`, `ALLOWED_GOOGLE_EMAIL_2`.
 5. Добавьте production Redirect URI `https://ВАШ-ДОМЕН/api/auth/callback` в Google OAuth-клиент и выполните deployment.
 
-Для каждого пользователя в allowlist нужен Google `sub`, а не email. Изменение разрешённых пользователей выполняется только через серверные переменные; удаление `sub` из списка отказывает уже существующей сессии на следующем запросе. Для отзыва конкретной сессии можно установить `revoked_at` в таблице `sessions` или воспользоваться кнопкой выхода.
+При первом входе подтверждённый Gmail или Google Workspace адрес из списка однократно привязывается к Google `sub`. Для внешних адресов без подтверждённого Google-домена автоматическая привязка запрещена. После привязки другой `sub` с тем же email не получает доступ. Удаление адреса из серверного списка отзывает доступ связанного пользователя на следующем запросе. Для отзыва конкретной сессии можно установить `revoked_at` в таблице `sessions` или воспользоваться кнопкой выхода.
 
 `DATABASE_URL`, OAuth Client Secret и другие секреты должны оставаться только в локальном окружении и настройках Vercel. Реальные финансовые данные не вводите в preview-окружения. Публикация приложения и настройка реальных секретов выполняются отдельно.
 

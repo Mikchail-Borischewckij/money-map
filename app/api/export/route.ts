@@ -7,7 +7,7 @@ export async function GET() {
   const h = session.householdId
   const [household, users, accounts, categories, recurringIncomes, recurringPayments, plans, balances, incomes, payments, allocations, audit] = await Promise.all([
     db()`SELECT id, name, currency, time_zone, created_at, updated_at FROM households WHERE id = ${h}`,
-    db()`SELECT id, household_id, google_subject, email, display_name, is_active, created_at, updated_at FROM users WHERE household_id = ${h}`,
+    db()`SELECT id, household_id, google_subject, initial_email, email, display_name, is_active, created_at, updated_at FROM users WHERE household_id = ${h}`,
     db()`SELECT * FROM accounts WHERE household_id = ${h}`,
     db()`SELECT * FROM categories WHERE household_id = ${h}`,
     db()`SELECT * FROM recurring_incomes WHERE household_id = ${h}`,

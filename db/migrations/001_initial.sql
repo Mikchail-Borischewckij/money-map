@@ -15,6 +15,7 @@ CREATE TABLE users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   household_id uuid NOT NULL REFERENCES households(id),
   google_subject text NOT NULL UNIQUE,
+  initial_email text NOT NULL UNIQUE CHECK (initial_email = lower(initial_email)),
   email text NOT NULL,
   display_name text NOT NULL,
   is_active boolean NOT NULL DEFAULT true,

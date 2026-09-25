@@ -13,9 +13,21 @@ export type Session = {
   tokenHash: string
 }
 
-export function allowedSubjects() {
-  const subjects = [process.env.ALLOWED_GOOGLE_SUB_1, process.env.ALLOWED_GOOGLE_SUB_2].filter((value): value is string => Boolean(value))
-  return subjects.length === 2 && subjects[0] !== subjects[1] ? subjects : []
+export function allowedEmails() {
+  const emails = [process.env.ALLOWED_GOOGLE_EMAIL_1, process.env.ALLOWED_GOOGLE_EMAIL_2]
+    .map((value) => value?.trim().toLowerCase())
+    .filter((value): value is string => Boolean(value && value.includes('@')))
+  return emails.length === 2 && emails[0] !== emails[1] ? emails : []
+}
+
+export function canUseGoogleIdentity(email: string, emailVerified: boolean, hostedDomain?: string, boundInitialEmail?: string) {
+  const allowlist = allowedEmails()
+  if (allowlist.length !== 2) return false
+  if (boundInitialEmail) return allowlist.includes(boundInitialEmail)
+  const normalized = email.trim().toLowerCase()
+  const domain = normalized.split('@')[1]
+  const googleOwnsEmail = domain === 'gmail.com' || Boolean(hostedDomain && hostedDomain.toLowerCase() === domain)
+  return emailVerified && googleOwnsEmail && allowlist.includes(normalized)
 }
 
 export function randomToken() { return randomBytes(32).toString('base64url') }
@@ -23,15 +35,15 @@ export function hashToken(token: string) { return createHash('sha256').update(to
 
 export async function getSession(): Promise<Session | null> {
   const token = (await cookies()).get(sessionCookie)?.value
-  if (!token || allowedSubjects().length !== 2 || !process.env.DATABASE_URL) return null
+  if (!token || allowedEmails().length !== 2 || !process.env.DATABASE_URL) return null
   const tokenHash = hashToken(token)
   const rows = await db()`
-    SELECT u.id AS user_id, u.household_id, u.google_subject, u.display_name, s.csrf_token
+    SELECT u.id AS user_id, u.household_id, u.google_subject, u.initial_email, u.display_name, s.csrf_token
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ${tokenHash} AND s.revoked_at IS NULL AND s.expires_at > now() AND u.is_active = true
   `
   const row = rows[0]
-  if (!row || !allowedSubjects().includes(row.google_subject)) return null
+  if (!row || !allowedEmails().includes(row.initial_email)) return null
   return {
     userId: row.user_id,
     householdId: row.household_id,
