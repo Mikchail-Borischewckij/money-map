@@ -24,3 +24,22 @@ it('applies the initial PostgreSQL migration and enforces one plan per month', a
     await pg.close()
   }
 })
+
+it('adds users.initial_email to databases created by the early initial migration', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    const initial = await readFile(new URL('./migrations/001_initial.sql', import.meta.url), 'utf8')
+    const upgrade = await readFile(new URL('./migrations/002_users_initial_email.sql', import.meta.url), 'utf8')
+    await pg.exec(initial)
+    await pg.exec('ALTER TABLE users DROP COLUMN initial_email')
+    await pg.exec(upgrade)
+    await pg.exec(upgrade)
+    const household = await pg.query<{ id: string }>('SELECT id FROM households')
+    const insert = 'INSERT INTO users (household_id, google_subject, initial_email, email, display_name) VALUES ($1, $2, $3, $3, $4)'
+    await pg.query(insert, [household.rows[0].id, 'sub-1', 'test@example.invalid', 'Test'])
+    await expect(pg.query(insert, [household.rows[0].id, 'sub-2', 'test@example.invalid', 'Test'])).rejects.toThrow()
+    await expect(pg.query(insert, [household.rows[0].id, 'sub-3', 'Upper@example.invalid', 'Test'])).rejects.toThrow()
+  } finally {
+    await pg.close()
+  }
+})

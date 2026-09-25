@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
 import postgres from 'postgres'
 
 const connection = process.env.DATABASE_URL
@@ -10,17 +10,22 @@ const sql = postgres(connection, {
   max: 1,
 })
 
+const directory = new URL('../db/migrations/', import.meta.url)
+
 try {
-  const migration = await readFile(new URL('../db/migrations/001_initial.sql', import.meta.url), 'utf8')
+  const files = (await readdir(directory)).filter((file) => file.endsWith('.sql')).sort()
   await sql.begin(async (transaction) => {
     await transaction.unsafe('CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())')
-    const applied = await transaction`SELECT name FROM schema_migrations WHERE name = '001_initial'`
-    if (applied.length === 0) {
-      await transaction.unsafe(migration)
-      await transaction`INSERT INTO schema_migrations (name) VALUES ('001_initial') ON CONFLICT (name) DO NOTHING`
+    for (const file of files) {
+      const name = file.replace(/\.sql$/, '')
+      const applied = await transaction`SELECT name FROM schema_migrations WHERE name = ${name}`
+      if (applied.length > 0) continue
+      await transaction.unsafe(await readFile(new URL(file, directory), 'utf8'))
+      await transaction`INSERT INTO schema_migrations (name) VALUES (${name}) ON CONFLICT (name) DO NOTHING`
+      console.log(`Applied ${name}`)
     }
   })
-  console.log('Database migration 001_initial is ready')
+  console.log('Database migrations are up to date')
 } finally {
   await sql.end()
 }
