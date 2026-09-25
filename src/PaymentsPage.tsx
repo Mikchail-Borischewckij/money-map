@@ -2,13 +2,11 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, RotateCcw, Trash2, X } from 'lucide-react'
-import { toCents } from './api-client'
 import type { Payment, Plan } from './domain'
-import { AmountInput, WeekdayPicker } from './fields'
-import { countWeekdays, weekdayLabel, type PaymentSchedule } from './schedule'
+import { AmountInput } from './fields'
+import { countWeekdays, weekdayLabel } from './schedule'
 
 type Category = { id: string; name: string; is_archived: boolean }
-type AddKind = 'once' | PaymentSchedule
 
 const money = (amount: number) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'PLN', maximumFractionDigits: 2 }).format(amount)
 const total = (payments: Payment[]) => payments.reduce((sum, payment) => sum + payment.amount, 0)
@@ -25,12 +23,13 @@ function scheduleLabel(payment: Payment) {
   return isDate(payment.due) ? `Каждый месяц, ${Number(payment.due.slice(8))}-го` : 'Каждый месяц'
 }
 
-export default function PaymentsPage({ plan, csrfToken, onAdd, onChange, onRemove, onReset }: {
-  plan: Plan; csrfToken: string
+export default function PaymentsPage({ plan, onAdd, onChange, onRemove, onReset, onOpenDirectory }: {
+  plan: Plan
   onAdd: (payment: Payment) => void
   onChange: (id: string, patch: Partial<Payment>) => void
   onRemove: (id: string) => void
   onReset: (id: string) => void
+  onOpenDirectory: () => void
 }) {
   const [adding, setAdding] = useState(false)
   const [message, setMessage] = useState('')
@@ -45,10 +44,10 @@ export default function PaymentsPage({ plan, csrfToken, onAdd, onChange, onRemov
 
   return <>
     <section className="page-heading compact"><div><span className="eyebrow">ТЕКУЩИЙ МЕСЯЦ</span><h1>Платежи месяца</h1><p>Изменения здесь касаются только этого месяца. Регулярные платежи каждый новый месяц создаются заново из справочника.</p></div>
-      <button className="primary-button" onClick={() => { setAdding(true); setMessage('') }}><Plus />Добавить платёж</button></section>
+      <button className="primary-button" onClick={() => { setAdding(true); setMessage('') }}><Plus />Разовый платёж</button></section>
     {message && <p className="template-message" role="status">{message}</p>}
-    {adding && <PaymentForm plan={plan} categories={categories} csrfToken={csrfToken} onCancel={() => setAdding(false)}
-      onSaved={(payment, note) => { onAdd(payment); setAdding(false); setMessage(note) }} />}
+    {adding && <PaymentForm plan={plan} categories={categories} onCancel={() => setAdding(false)} onOpenDirectory={onOpenDirectory}
+      onSaved={(payment) => { onAdd(payment); setAdding(false); setMessage('Разовый платёж добавлен только в этот месяц.') }} />}
     <PaymentGroup title="Регулярные" hint="Из справочника: каждый месяц или по дням недели" payments={regular}>{regular.map(row)}</PaymentGroup>
     <PaymentGroup title="Разовые в этом месяце" hint="Есть только в этом месяце и не переходят в следующий" payments={once}>{once.map(row)}</PaymentGroup>
     {excluded.length > 0 && <details className="panel payment-group excluded-group">
@@ -104,62 +103,32 @@ function PaymentRow({ payment, accounts, month, onChange, onRemove, onReset }: {
   </div>
 }
 
-function PaymentForm({ plan, categories, csrfToken, onCancel, onSaved }: {
-  plan: Plan; categories: Category[]; csrfToken: string
-  onCancel: () => void; onSaved: (payment: Payment, note: string) => void
+function PaymentForm({ plan, categories, onCancel, onSaved, onOpenDirectory }: {
+  plan: Plan; categories: Category[]
+  onCancel: () => void; onSaved: (payment: Payment) => void; onOpenDirectory: () => void
 }) {
   const accounts = plan.accounts.filter((account) => !account.isArchived)
-  const [kind, setKind] = useState<AddKind>('once')
   const [name, setName] = useState('')
   const [amount, setAmount] = useState(0)
   const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
   const [categoryId, setCategoryId] = useState('')
   const [date, setDate] = useState('')
-  const [day, setDay] = useState('')
-  const [weekdays, setWeekdays] = useState<number[]>([])
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const occurrences = countWeekdays(plan.month, weekdays)
   const category = categories.find((item) => item.id === categoryId)?.name ?? ''
 
-  async function submit(event: React.FormEvent) {
+  function submit(event: React.FormEvent) {
     event.preventDefault()
     if (!name.trim() || !accountId) return
-    if (kind === 'weekly' && weekdays.length === 0) { setError('Выберите хотя бы один день недели.'); return }
-    const base = { id: crypto.randomUUID(), name: name.trim(), accountId, enabled: true, category }
-    if (kind === 'once') { onSaved({ ...base, amount, due: date || 'в течение месяца' }, 'Разовый платёж добавлен только в этот месяц.'); return }
-    const dayNumber = kind === 'monthly' && day ? Number(day) : null
-    setBusy(true); setError('')
-    try {
-      const response = await fetch('/api/recurring-payments', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ name: base.name, defaultAmount: toCents(amount), accountId, day: dayNumber, activeFrom: `${plan.month}-01`, activeTo: null, categoryId: categoryId || null, schedule: kind, weekdays: kind === 'weekly' ? weekdays : null }),
-      })
-      if (!response.ok) throw new Error('Не удалось сохранить регулярный платёж.')
-      const template = await response.json()
-      const payment: Payment = kind === 'weekly'
-        ? { ...base, recurringPaymentId: template.id, schedule: 'weekly', weekdays, unitPrice: amount, quantity: occurrences, amount: round(amount * occurrences), due: 'в течение месяца' }
-        : { ...base, recurringPaymentId: template.id, schedule: 'monthly', weekdays: null, amount, due: dayNumber ? dayInMonth(plan.month, dayNumber) : 'в течение месяца' }
-      onSaved(payment, 'Регулярный платёж добавлен в этот месяц и в справочник: следующие месяцы получат его автоматически.')
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Ошибка')
-    } finally { setBusy(false) }
+    onSaved({ id: crypto.randomUUID(), name: name.trim(), accountId, enabled: true, category, amount, due: date || 'в течение месяца' })
   }
 
-  return <form className="panel payment-form" onSubmit={(event) => void submit(event)}>
-    <div className="segmented" role="radiogroup" aria-label="Как часто">
-      {([['once', 'Только в этом месяце'], ['monthly', 'Каждый месяц'], ['weekly', 'По дням недели']] as const).map(([value, label]) =>
-        <button key={value} type="button" role="radio" aria-checked={kind === value} className={kind === value ? 'active' : ''} onClick={() => setKind(value)}>{label}</button>)}
-    </div>
+  return <form className="panel payment-form" onSubmit={submit}>
+    <h2 className="form-wide">Разовый платёж в этом месяце</h2>
     <label>Название <input required value={name} onChange={(event) => setName(event.target.value)} /></label>
-    <label>{kind === 'weekly' ? 'Цена за один раз, zł' : 'Сумма, zł'} <AmountInput label="Сумма" value={amount} onChange={setAmount} /></label>
+    <label>Сумма, zł <AmountInput label="Сумма" value={amount} onChange={setAmount} /></label>
     <label>Счёт <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></label>
     <label>Категория <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">Без категории</option>{categories.filter((item) => !item.is_archived).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-    {kind === 'once' && <label>Дата (необязательно) <input type="date" min={`${plan.month}-01`} max={dayInMonth(plan.month, 31)} value={date} onChange={(event) => setDate(event.target.value)} /></label>}
-    {kind === 'monthly' && <label>День месяца (необязательно) <input type="number" min="1" max="31" placeholder="В течение месяца" value={day} onChange={(event) => setDay(event.target.value)} /></label>}
-    {kind === 'weekly' && <div className="form-wide"><span className="field-label">Дни недели</span><WeekdayPicker value={weekdays} onChange={setWeekdays} />
-      <small>В этом месяце: {occurrences} раз × {money(amount)} = {money(round(amount * occurrences))}. Количество можно поправить в строке платежа.</small></div>}
-    {error && <p className="form-error" role="alert">{error}</p>}
-    <div className="form-actions"><button className="primary-button" type="submit" disabled={busy}>{busy ? 'Сохранение…' : 'Добавить'}</button><button className="secondary-button" type="button" onClick={onCancel}>Отмена</button></div>
+    <label>Дата (необязательно) <input type="date" min={`${plan.month}-01`} max={dayInMonth(plan.month, 31)} value={date} onChange={(event) => setDate(event.target.value)} /></label>
+    <p className="form-wide form-note">Платёж повторяется каждый месяц или по дням недели? Добавьте его в <button type="button" className="link-button" onClick={onOpenDirectory}>справочник</button>.</p>
+    <div className="form-actions"><button className="primary-button" type="submit">Добавить</button><button className="secondary-button" type="button" onClick={onCancel}>Отмена</button></div>
   </form>
 }

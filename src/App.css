@@ -23,3 +23,6 @@
 @media(max-width:1000px){.payment-row{grid-template-columns:minmax(0,1fr) 150px 130px}.payment-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center}.payment-actions input{flex:1 1 220px;width:auto}}
 @media(max-width:760px){.payment-group{padding:0 14px 4px}.payment-row{grid-template-columns:minmax(0,1fr) 120px;gap:8px}.payment-row>select{grid-column:1/-1;grid-row:2}.payment-form{grid-template-columns:1fr}.ledger-row.no-switch{grid-template-columns:minmax(0,1fr) 110px}.ledger-row.no-switch select{grid-column:1/-1}}
 @media(max-width:420px){.payment-row{grid-template-columns:1fr}.payment-row>.amount-input,.payment-row>.payment-total{grid-column:1;width:100%}.payment-total{text-align:left}.segmented{justify-self:stretch}.segmented button{flex:1 1 auto}}
+
+.form-note{margin:0;color:#66717d;font-size:12px;}
+.link-button{border:0;background:none;padding:0;color:#315c49;font:inherit;text-decoration:underline}
