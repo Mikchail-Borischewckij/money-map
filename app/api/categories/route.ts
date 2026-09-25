@@ -7,7 +7,10 @@ const input = z.object({ name: z.string().trim().min(1).max(100) })
 export async function GET() {
   const session = await getSession()
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: privateHeaders })
-  return Response.json(await db()`SELECT id, name, display_order, is_archived, version FROM categories WHERE household_id = ${session.householdId} ORDER BY display_order, name`, { headers: privateHeaders })
+  // `in_use`: a regular payment refers to it (in any version), so it can only be archived, not deleted.
+  return Response.json(await db()`SELECT c.id, c.name, c.display_order, c.is_archived, c.version,
+    (EXISTS (SELECT 1 FROM recurring_payments p WHERE p.category_id = c.id) OR EXISTS (SELECT 1 FROM payment_template_versions v WHERE v.category_id = c.id)) AS in_use
+    FROM categories c WHERE c.household_id = ${session.householdId} ORDER BY c.display_order, c.name`, { headers: privateHeaders })
 }
 
 export async function POST(request: Request) {
