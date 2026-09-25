@@ -6,3 +6,9 @@
 node_modules
 dist
 coverage
+*.tsbuildinfo
+**/*.test.ts
+docs
+AGENTS.md
+README.md
+docker-compose.yml
