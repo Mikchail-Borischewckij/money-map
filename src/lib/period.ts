@@ -1,6 +1,8 @@
 // A planning period: it starts on `startDay` of `month` and ends the day before `startDay` of the next month.
 // With startDay 1 it is the calendar month. `month` (YYYY-MM) names the period by the month it starts in.
-export type Period = { month: string; startDay: number }
+// `from`: the date the balances were entered on. What happened before it is already in the balances,
+// so weekly items are counted from it; without it the whole period counts.
+export type Period = { month: string; startDay: number; from?: string | null }
 
 export const maxStartDay = 28
 
@@ -31,11 +33,22 @@ export function dayInPeriod(period: Period, day: number | null) {
   return day >= period.startDay ? dateIn(period.month, day) : dateIn(shiftMonth(period.month, 1), day)
 }
 
-// ISO weekdays: 1 = Monday … 7 = Sunday.
+// The first day that still counts: the balances date when it falls inside the period, else the period start.
+export const countFrom = (period: Period) => period.from && period.from > periodStart(period) ? period.from : periodStart(period)
+
+// Every day of the period, for choosing the balances date.
+export function periodDays(period: Period) {
+  const days: string[] = []
+  const end = Date.parse(`${periodEnd(period)}T00:00:00Z`)
+  for (let time = Date.parse(`${periodStart(period)}T00:00:00Z`); time <= end; time += 86400000) days.push(new Date(time).toISOString().slice(0, 10))
+  return days
+}
+
+// Occurrences of the weekdays from the balances date to the end of the period. ISO weekdays: 1 = Monday … 7 = Sunday.
 export function countWeekdaysInPeriod(period: Period, weekdays: number[]) {
   const end = Date.parse(`${periodEnd(period)}T00:00:00Z`)
   let count = 0
-  for (let time = Date.parse(`${periodStart(period)}T00:00:00Z`); time <= end; time += 86400000) {
+  for (let time = Date.parse(`${countFrom(period)}T00:00:00Z`); time <= end; time += 86400000) {
     if (weekdays.includes(new Date(time).getUTCDay() || 7)) count++
   }
   return count

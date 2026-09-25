@@ -4,7 +4,7 @@ import { money } from '@/lib/format'
 import { countWeekdaysInPeriod, type Period } from '@/lib/period'
 import { weekdayLabel } from '@/lib/schedule'
 import Amount from './Amount'
-import { dayText, round } from './utils'
+import { beforeBalances, dayText, round } from './utils'
 
 export default function PaymentRow({ payment, period, readOnly, accountTag, onChange, onRemove, onReset }: {
   payment: Payment; period: Period; readOnly: boolean; accountTag: (id: string) => React.ReactNode
@@ -29,8 +29,9 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
   const calendar = weekly && payment.weekdays ? countWeekdaysInPeriod(period, payment.weekdays) : null
   const setQuantity = (quantity: number) => onChange({ quantity, amount: round(payment.unitPrice! * quantity) })
   const toCheck = amountToCheck(payment)
+  const past = !weekly && beforeBalances(period, payment.due)
   return <div className="row">
-    <div className="row-main"><strong>{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}{toCheck && <Badge tone="warn">уточните сумму</Badge>}</strong><span className="row-meta row-tags">{meta}</span></div>
+    <div className="row-main"><strong>{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}{toCheck && <Badge tone="warn">уточните сумму</Badge>}{past && <Badge tone="warn">дата прошла</Badge>}</strong><span className="row-meta row-tags">{meta}</span></div>
     <div className="row-side row-side-wrap">
       {weekly ? <>
         <div className="units">
@@ -41,6 +42,7 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
         <strong className="amount">{money(payment.amount)}</strong>
       </> : <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={readOnly} onChange={(amount) => onChange({ amount, amountPending: false })} />}
       {!readOnly && toCheck && <Button size="sm" variant="ghost" onClick={() => onChange({ amountPending: false })}>Сумма верна</Button>}
+      {!readOnly && past && <Button size="sm" variant="ghost" onClick={() => onChange({ enabled: false, exclusionReason: 'Оплачен до даты остатков' })}>Уже оплачен</Button>}
       <RowMenu label={`Действия: ${payment.name}`} items={menu} />
     </div>
   </div>

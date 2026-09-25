@@ -60,3 +60,16 @@ describe('period', () => {
     expect(periodOf('2026-01-03', 15)).toEqual({ month: '2025-12', startDay: 15 })
   })
 })
+
+describe('balances date', () => {
+  it('counts weekly items from the balances date to the end of the period', async () => {
+    const { countWeekdaysInPeriod, countFrom } = await import('./period')
+    const period = { month: '2026-09', startDay: 15 }
+    expect(countWeekdaysInPeriod(period, [1, 4])).toBe(8)
+    // From Friday 25 Sep: Mondays 28, 5, 12 and Thursdays 1, 8.
+    expect(countWeekdaysInPeriod({ ...period, from: '2026-09-25' }, [1, 4])).toBe(5)
+    // A Thursday on the balances date still counts.
+    expect(countWeekdaysInPeriod({ ...period, from: '2026-09-24' }, [4])).toBe(3)
+    expect(countFrom({ ...period, from: '2026-09-01' })).toBe('2026-09-15')
+  })
+})

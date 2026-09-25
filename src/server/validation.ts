@@ -38,7 +38,7 @@ const allocation = z.object({
 export const planInput = z.object({
   expectedVersion: z.number().int().positive(),
   plan: z.object({
-    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), startDay: z.number().int().min(1).max(28).optional(),
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), startDay: z.number().int().min(1).max(28).optional(), balancesOn: z.iso.date().nullable().optional(),
     accounts: z.array(z.object({ id: uuid, name, kind: accountKind, openingBalance: moneySchema, balanceConfirmed: z.boolean().optional(), balanceDate: z.iso.date().nullable().optional(), canFundTransfers: z.boolean(), priority: z.number().int().min(0).max(10000), sweepToAccountId: uuid.nullable().optional(), keepAmount: moneySchema.optional() })),
     incomes: z.array(income), payments: z.array(payment), allocations: z.array(allocation),
   }),

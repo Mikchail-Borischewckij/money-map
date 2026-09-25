@@ -15,7 +15,7 @@ const zl = (cents: number) => cents / 100
 
 export function toUiPlan(plan: MoneyPlan): Plan {
   return {
-    month: plan.month, startDay: plan.startDay,
+    month: plan.month, startDay: plan.startDay, balancesOn: plan.balancesOn ?? null,
     accounts: plan.accounts.map((account) => ({ ...account, kind: account.kind as Account['kind'], openingBalance: zl(account.openingBalance), keepAmount: zl(account.keepAmount ?? 0) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: zl(income.amount) })),
     payments: plan.payments.map((payment) => ({ ...payment, amount: zl(payment.amount), unitPrice: payment.unitPrice == null ? null : zl(payment.unitPrice) })),
@@ -52,7 +52,7 @@ export function toCents(value: number) {
 
 export function toApiPlan(plan: Plan): MoneyPlan {
   return {
-    month: plan.month, startDay: plan.startDay,
+    month: plan.month, startDay: plan.startDay, balancesOn: plan.balancesOn ?? null,
     accounts: plan.accounts.map((account) => ({ ...account, openingBalance: toCents(account.openingBalance), keepAmount: toCents(account.keepAmount ?? 0) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: toCents(income.amount) })),
     payments: plan.payments.map((payment) => {

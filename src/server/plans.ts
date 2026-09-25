@@ -1,10 +1,10 @@
 import { db, intArray } from './db'
 import type { Session } from './auth'
 import { calculateMoneyPlan, type MoneyIncome, type MoneyPayment, type MoneyPlan } from './money'
-import { templateAt, type OpenPlan } from './open-month'
+import { periodOfPlan, templateAt, type OpenPlan } from './open-month'
 import { planInput } from './validation'
 import { incomeFromTemplate, paymentFromTemplate, whenever, type IncomeTemplate, type PaymentTemplate } from '../lib/month-merge'
-import { periodOf, type Period } from '../lib/period'
+import { periodEnd, periodOf, periodStart, type Period } from '../lib/period'
 
 const monthText = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 
@@ -104,10 +104,16 @@ export function insertPayments(tx: Sql, planId: string, version: number, payment
       due_date date, is_enabled boolean, schedule_snapshot text, weekdays_snapshot text, unit_price bigint, quantity integer, exclusion_reason text, amount_pending boolean)`
 }
 
+// A month started after its first day has its balances entered today, so what already happened is not counted again.
+export function balancesDate(period: Period, today = warsawDate()) {
+  return today < periodStart(period) ? periodStart(period) : today > periodEnd(period) ? periodEnd(period) : today
+}
+
 async function insertPlan(tx: Sql, session: Session, year: number, month: number, startDay: number) {
-  const period: Period = { month: monthText(year, month), startDay }
-  const inserted = await tx`INSERT INTO monthly_plans (household_id, year, month, start_day, created_by, updated_by)
-    VALUES (${session.householdId}, ${year}, ${month}, ${startDay}, ${session.userId}, ${session.userId}) RETURNING id`
+  const base: Period = { month: monthText(year, month), startDay }
+  const period: Period = { ...base, from: balancesDate(base) }
+  const inserted = await tx`INSERT INTO monthly_plans (household_id, year, month, start_day, balance_date, created_by, updated_by)
+    VALUES (${session.householdId}, ${year}, ${month}, ${startDay}, ${period.from ?? null}, ${session.userId}, ${session.userId}) RETURNING id`
   const planId = inserted[0].id as string
   const { incomes, payments } = await activeTemplates(tx, session.householdId, `${period.month}-01`)
   await Promise.all([
@@ -192,6 +198,7 @@ export async function readPlan(session: Session, id: string) {
   const plan: MoneyPlan = {
     month: monthText(record.year, record.month),
     startDay: record.start_day,
+    balancesOn: record.balance_date ?? null,
     accounts: accounts.map((account) => {
       const balance = balanceMap.get(account.id)
       return {
@@ -224,6 +231,8 @@ export async function savePlan(session: Session, id: string, value: unknown) {
     if (current[0].status !== 'Draft') return 'finalized'
     if (current[0].version !== input.expectedVersion) return 'conflict'
     if (plan.month !== monthText(current[0].year, current[0].month)) return 'invalid'
+    const period: Period = { month: plan.month, startDay: current[0].start_day }
+    if (plan.balancesOn && (plan.balancesOn < periodStart(period) || plan.balancesOn > periodEnd(period))) return 'invalid'
     const accountIds = new Set(allowed.map((account) => account.id as string))
     const allIds = [...plan.accounts.map((account) => account.id), ...plan.incomes.map((income) => income.accountId), ...plan.payments.map((payment) => payment.accountId), ...plan.allocations.map((allocation) => allocation.accountId)]
     if (allIds.some((accountId) => !accountIds.has(accountId))) return 'invalid'
@@ -234,7 +243,7 @@ export async function savePlan(session: Session, id: string, value: unknown) {
     const balances = plan.accounts.map((account) => ({ account_id: account.id, amount: account.openingBalance, balance_date: account.balanceDate ?? null, is_confirmed: account.balanceConfirmed ?? false }))
     // Queries issued together on the transaction's connection are pipelined and run in this order.
     await Promise.all([
-      tx`UPDATE monthly_plans SET version = ${newVersion}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${id}`,
+      tx`UPDATE monthly_plans SET version = ${newVersion}, balance_date = ${plan.balancesOn ?? null}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${id}`,
       tx`DELETE FROM account_balances WHERE monthly_plan_id = ${id}`,
       tx`DELETE FROM monthly_incomes WHERE monthly_plan_id = ${id}`,
       tx`DELETE FROM monthly_payments WHERE monthly_plan_id = ${id}`,
@@ -301,11 +310,11 @@ export async function changePlanStatus(session: Session, id: string, action: 'fi
 async function resetItem(session: Session, kind: 'payment' | 'income', planId: string, itemId: string, expectedVersion: number) {
   const result = await db().begin(async (transaction) => {
     const tx = transaction as unknown as Sql
-    const plans = await tx`SELECT id, year, month, start_day, version, status FROM monthly_plans WHERE id = ${planId} AND household_id = ${session.householdId} FOR UPDATE`
+    const plans = await tx`SELECT id, year, month, start_day, balance_date::text, version, status FROM monthly_plans WHERE id = ${planId} AND household_id = ${session.householdId} FOR UPDATE`
     if (!plans[0]) return 'missing'
     if (plans[0].version !== expectedVersion || plans[0].status !== 'Draft') return 'conflict'
-    const plan: OpenPlan = { id: plans[0].id, year: plans[0].year, month: plans[0].month, startDay: plans[0].start_day, version: plans[0].version }
-    const period: Period = { month: monthText(plan.year, plan.month), startDay: plan.startDay }
+    const plan: OpenPlan = { id: plans[0].id, year: plans[0].year, month: plans[0].month, startDay: plans[0].start_day, balancesOn: plans[0].balance_date, version: plans[0].version }
+    const period = periodOfPlan(plan)
     const rows = kind === 'payment'
       ? await tx`SELECT recurring_payment_id AS template_id FROM monthly_payments WHERE id = ${itemId} AND monthly_plan_id = ${planId}`
       : await tx`SELECT recurring_income_id AS template_id FROM monthly_incomes WHERE id = ${itemId} AND monthly_plan_id = ${planId}`

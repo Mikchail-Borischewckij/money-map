@@ -24,3 +24,6 @@ export function periodTitle(month: string, startDay = 1) {
 
 // An amount without the currency, for tables that name it once: "2 500" or "2 500,5".
 export const amount = (value: number) => new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value)
+
+// "25 сентября, пт"
+export const dayLabel = (date: string) => new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long', weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`)).replace(/^(\S+), (.*)$/, '$2, $1')

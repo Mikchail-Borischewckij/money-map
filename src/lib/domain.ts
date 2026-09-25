@@ -62,6 +62,8 @@ export type Plan = {
   month: string
   // The day of the month the period starts on; 1 means the calendar month.
   startDay?: number
+  // The date the balances are entered on: earlier payments and incomes are already in them.
+  balancesOn?: string | null
   accounts: Account[]
   incomes: Income[]
   payments: Payment[]

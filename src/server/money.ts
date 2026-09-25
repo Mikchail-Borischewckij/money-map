@@ -4,7 +4,8 @@ export type MoneyIncome = { id: string; name: string; amount: number; accountId:
 export type MoneyPayment = { id: string; name: string; amount: number; accountId: string; due: string; enabled: boolean; category: string; recurringPaymentId?: string | null; schedule?: 'monthly' | 'weekly' | null; weekdays?: number[] | null; unitPrice?: number | null; quantity?: number | null; exclusionReason?: string; amountPending?: boolean }
 export type MoneyAllocation = { id: string; name: string; amount: number; accountId: string; kind: 'living' | 'savings' | 'other' }
 // `startDay`: the day of the month the period starts on (1 = calendar month). Set by the server.
-export type MoneyPlan = { month: string; startDay?: number; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[] }
+// `balancesOn`: the date the balances are entered on; weekly items count from it.
+export type MoneyPlan = { month: string; startDay?: number; balancesOn?: string | null; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[] }
 
 const cents = (value: number) => {
   if (!Number.isSafeInteger(value) || value < 0 || value > 9_000_000_000_000) throw new Error('Invalid money amount')

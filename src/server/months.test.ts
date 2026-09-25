@@ -24,3 +24,13 @@ describe('the current period', () => {
     expect(calendarMonth(new Date('2027-01-05T10:00:00Z'), 15)).toEqual({ year: 2026, month: 12 })
   })
 })
+
+describe('balances date of a new month', () => {
+  it('is today inside the period, else its first or last day', async () => {
+    const { balancesDate } = await import('./plans')
+    const period = { month: '2026-09', startDay: 15 }
+    expect(balancesDate(period, '2026-09-25')).toBe('2026-09-25')
+    expect(balancesDate(period, '2026-09-10')).toBe('2026-09-15')
+    expect(balancesDate(period, '2026-10-20')).toBe('2026-10-14')
+  })
+})

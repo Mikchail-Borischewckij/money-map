@@ -85,6 +85,8 @@
 .summary-lines:last-child { border-bottom: 0; }
 .add-saving { justify-self: start; }
 .warn-text { font-size: 13px; color: var(--danger); }
+.balances-date { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.balances-date .select-compact { width: 200px; }
 .total-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 0 2px; border-top: 2px solid var(--border-strong); font-weight: 600; }
 
 /* Accounts and transfers */
@@ -269,6 +271,9 @@
 }
 @media (max-width: 640px) {
   .data-table .col-opt { display: none; }
+  .section-head { flex-wrap: wrap; }
+  .section-head > .balances-date { flex: 1 1 100%; }
+  .balances-date .select-compact { flex: 1; width: auto; }
   .cell-sub { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; font-size: 13px; color: var(--muted); }
   .data-table th, .data-table td { padding: 10px 6px; }
   .row { flex-direction: column; align-items: stretch; gap: 10px; }

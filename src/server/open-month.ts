@@ -2,20 +2,20 @@ import type { db } from './db'
 import type { Session } from './auth'
 import { insertIncomes, insertPayments, toIncome, toPayment, updateIncomes, updatePayments } from './month-rows'
 import { mergeIncome, mergePayment, type IncomeTemplate, type PaymentTemplate } from '../lib/month-merge'
-import { dayInPeriod, type Period } from '../lib/period'
+import { dayInPeriod, periodEnd, periodStart, type Period } from '../lib/period'
 
 type Sql = ReturnType<typeof db>
 type Kind = 'income' | 'payment'
-export type OpenPlan = { id: string; year: number; month: number; startDay: number; version: number }
+export type OpenPlan = { id: string; year: number; month: number; startDay: number; balancesOn?: string | null; version: number }
 
 const monthText = (plan: OpenPlan) => `${plan.year}-${String(plan.month).padStart(2, '0')}`
-export const periodOfPlan = (plan: OpenPlan): Period => ({ month: monthText(plan), startDay: plan.startDay })
+export const periodOfPlan = (plan: OpenPlan): Period => ({ month: monthText(plan), startDay: plan.startDay, from: plan.balancesOn ?? null })
 const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const inMonth = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре']
 
 export async function lockOpenPlan(tx: Sql, householdId: string): Promise<OpenPlan | null> {
-  const rows = await tx`SELECT id, year, month, start_day, version FROM monthly_plans WHERE household_id = ${householdId} AND status = 'Draft' FOR UPDATE`
-  return rows[0] ? { id: rows[0].id, year: rows[0].year, month: rows[0].month, startDay: rows[0].start_day, version: rows[0].version } : null
+  const rows = await tx`SELECT id, year, month, start_day, balance_date::text, version FROM monthly_plans WHERE household_id = ${householdId} AND status = 'Draft' FOR UPDATE`
+  return rows[0] ? { id: rows[0].id, year: rows[0].year, month: rows[0].month, startDay: rows[0].start_day, balancesOn: rows[0].balance_date, version: rows[0].version } : null
 }
 
 const incomeTemplate = (row: Record<string, unknown>): IncomeTemplate => ({ id: row.id as string, name: row.name as string, accountId: row.account_id as string, amount: Number(row.default_amount), day: row.expected_day as number | null, varies: Boolean(row.amount_varies) })
@@ -91,7 +91,10 @@ export async function applyToOpenMonth(tx: Sql, session: Session, kind: Kind, id
 export async function shiftOpenMonth(tx: Sql, session: Session, plan: OpenPlan, startDay: number) {
   if (plan.startDay === startDay) return
   const before = periodOfPlan(plan)
-  const after: Period = { ...before, startDay }
+  // The balances date stays, moved into the new period if it now falls outside it.
+  const shifted: Period = { month: before.month, startDay }
+  const from = before.from ? (before.from < periodStart(shifted) ? periodStart(shifted) : before.from > periodEnd(shifted) ? periodEnd(shifted) : before.from) : null
+  const after: Period = { ...shifted, from }
   const [payments, incomes] = await Promise.all([
     tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending
       FROM monthly_payments WHERE monthly_plan_id = ${plan.id}`,
@@ -110,7 +113,7 @@ export async function shiftOpenMonth(tx: Sql, session: Session, plan: OpenPlan, 
   }))
   const version = plan.version + 1
   await Promise.all([
-    tx`UPDATE monthly_plans SET start_day = ${startDay} WHERE id = ${plan.id}`,
+    tx`UPDATE monthly_plans SET start_day = ${startDay}, balance_date = ${from} WHERE id = ${plan.id}`,
     updatePayments(tx, plan.id, version, nextPayments),
     updateIncomes(tx, plan.id, version, nextIncomes),
     bump(tx, session, plan, version, 'period'),
