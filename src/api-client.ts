@@ -18,7 +18,7 @@ export function toUiPlan(plan: MoneyPlan): Plan {
     month: plan.month,
     accounts: plan.accounts.map((account) => ({ ...account, kind: account.kind as Account['kind'], openingBalance: zl(account.openingBalance) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: zl(income.amount) })),
-    payments: plan.payments.map((payment) => ({ ...payment, amount: zl(payment.amount) })),
+    payments: plan.payments.map((payment) => ({ ...payment, amount: zl(payment.amount), unitPrice: payment.unitPrice == null ? null : zl(payment.unitPrice) })),
     allocations: plan.allocations.map((allocation) => ({ ...allocation, amount: zl(allocation.amount) })),
   }
 }
@@ -54,7 +54,11 @@ export function toApiPlan(plan: Plan): MoneyPlan {
     month: plan.month,
     accounts: plan.accounts.map((account) => ({ ...account, openingBalance: toCents(account.openingBalance) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: toCents(income.amount) })),
-    payments: plan.payments.map((payment) => ({ ...payment, amount: toCents(payment.amount) })),
+    payments: plan.payments.map((payment) => {
+      if (payment.unitPrice == null || payment.quantity == null) return { ...payment, amount: toCents(payment.amount), unitPrice: null, quantity: null }
+      const unitPrice = toCents(payment.unitPrice)
+      return { ...payment, unitPrice, amount: unitPrice * payment.quantity }
+    }),
     allocations: plan.allocations.map((allocation) => ({ ...allocation, amount: toCents(allocation.amount) })),
   }
 }

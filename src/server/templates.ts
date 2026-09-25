@@ -1,5 +1,5 @@
 import type { Session } from './auth'
-import { db } from './db'
+import { db, intArray } from './db'
 
 export type TemplateKind = 'income' | 'payment'
 export type TemplateValue = {
@@ -11,6 +11,8 @@ export type TemplateValue = {
   activeTo: string | null
   categoryId?: string | null
   version?: number
+  schedule?: 'monthly' | 'weekly'
+  weekdays?: number[] | null
 }
 
 export async function listTemplates(session: Session, kind: TemplateKind) {
@@ -19,7 +21,7 @@ export async function listTemplates(session: Session, kind: TemplateKind) {
     FROM recurring_incomes i JOIN LATERAL (SELECT effective_from FROM income_template_versions
       WHERE recurring_income_id = i.id ORDER BY effective_from DESC LIMIT 1) v ON true
     WHERE i.household_id = ${session.householdId} ORDER BY i.name`
-  return db()`SELECT p.id, p.name, p.default_amount, p.account_id, p.due_day AS day, p.category_id,
+  return db()`SELECT p.id, p.name, p.default_amount, p.account_id, p.due_day AS day, p.category_id, p.schedule, p.weekdays,
     p.active_from::text, p.active_to::text, p.is_archived, p.version, v.effective_from::text AS latest_effective_from
     FROM recurring_payments p JOIN LATERAL (SELECT effective_from FROM payment_template_versions
       WHERE recurring_payment_id = p.id ORDER BY effective_from DESC LIMIT 1) v ON true
@@ -48,10 +50,12 @@ export async function createTemplate(session: Session, kind: TemplateKind, value
         VALUES (${session.householdId}, ${session.userId}, 'RecurringIncome', ${rows[0].id}, 'create', 1)`
       return rows[0]
     }
-    const rows = await tx`INSERT INTO recurring_payments (household_id, name, default_amount, account_id, due_day, category_id, active_from, active_to)
-      VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.categoryId ?? null}, ${value.activeFrom}, ${value.activeTo}) RETURNING *`
-    await tx`INSERT INTO payment_template_versions (recurring_payment_id, effective_from, name, category_id, default_amount, account_id, due_day)
-      VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
+    const schedule = value.schedule ?? 'monthly'
+    const weekdays = intArray(value.weekdays)
+    const rows = await tx`INSERT INTO recurring_payments (household_id, name, default_amount, account_id, due_day, category_id, active_from, active_to, schedule, weekdays)
+      VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.categoryId ?? null}, ${value.activeFrom}, ${value.activeTo}, ${schedule}, ${weekdays}::integer[]) RETURNING *`
+    await tx`INSERT INTO payment_template_versions (recurring_payment_id, effective_from, name, category_id, default_amount, account_id, due_day, schedule, weekdays)
+      VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${schedule}, ${weekdays}::integer[])`
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'RecurringPayment', ${rows[0].id}, 'create', 1)`
     return rows[0]
@@ -86,16 +90,20 @@ export async function updateTemplate(session: Session, kind: TemplateKind, id: s
         VALUES (${session.householdId}, ${session.userId}, 'RecurringIncome', ${id}, 'update', ${version}, ${version + 1})`
       return rows[0]
     }
+    const schedule = value.schedule ?? 'monthly'
+    const weekdays = intArray(value.weekdays)
     if (value.activeFrom > latest[0].effective_from) {
       await tx`UPDATE payment_template_versions SET effective_to = (${value.activeFrom}::date - 1) WHERE id = ${latest[0].id}`
-      await tx`INSERT INTO payment_template_versions (recurring_payment_id, effective_from, name, category_id, default_amount, account_id, due_day)
-        VALUES (${id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
+      await tx`INSERT INTO payment_template_versions (recurring_payment_id, effective_from, name, category_id, default_amount, account_id, due_day, schedule, weekdays)
+        VALUES (${id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${schedule}, ${weekdays}::integer[])`
     } else {
       await tx`UPDATE payment_template_versions SET name = ${value.name}, category_id = ${value.categoryId ?? null},
-        default_amount = ${value.defaultAmount}, account_id = ${value.accountId}, due_day = ${value.day} WHERE id = ${latest[0].id}`
+        default_amount = ${value.defaultAmount}, account_id = ${value.accountId}, due_day = ${value.day},
+        schedule = ${schedule}, weekdays = ${weekdays}::integer[] WHERE id = ${latest[0].id}`
     }
     const rows = await tx`UPDATE recurring_payments SET name = ${value.name}, category_id = ${value.categoryId ?? null},
       default_amount = ${value.defaultAmount}, account_id = ${value.accountId}, due_day = ${value.day},
+      schedule = ${schedule}, weekdays = ${weekdays}::integer[],
       active_to = ${value.activeTo}, version = version + 1, updated_at = now() WHERE id = ${id} RETURNING *`
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'RecurringPayment', ${id}, 'update', ${version}, ${version + 1})`

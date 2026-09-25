@@ -43,3 +43,30 @@ it('adds users.initial_email to databases created by the early initial migration
     await pg.close()
   }
 })
+
+it('stores weekly payment schedules and keeps per-unit amounts consistent', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    for (const file of ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql']) {
+      await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    }
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    const user = (await pg.query<{ id: string }>("INSERT INTO users (household_id, google_subject, initial_email, email, display_name) VALUES ($1, 's', 't@example.invalid', 't@example.invalid', 'T') RETURNING id", [household])).rows[0].id
+    const account = (await pg.query<{ id: string }>("INSERT INTO accounts (household_id, name) VALUES ($1, 'Main') RETURNING id", [household])).rows[0].id
+    const insertTemplate = "INSERT INTO recurring_payments (household_id, name, default_amount, account_id, active_from, schedule, weekdays) VALUES ($1, 'Pool', 7000, $2, '2026-10-01', $3, $4::integer[])"
+    await pg.query(insertTemplate, [household, account, 'weekly', '{1,4}'])
+    await pg.query(insertTemplate, [household, account, 'monthly', null])
+    await expect(pg.query(insertTemplate, [household, account, 'weekly', null])).rejects.toThrow()
+    await expect(pg.query(insertTemplate, [household, account, 'weekly', '{0}'])).rejects.toThrow()
+    await expect(pg.query(insertTemplate, [household, account, 'monthly', '{1}'])).rejects.toThrow()
+
+    const plan = (await pg.query<{ id: string }>('INSERT INTO monthly_plans (household_id, year, month, created_by, updated_by) VALUES ($1, 2026, 10, $2, $2) RETURNING id', [household, user])).rows[0].id
+    const insertPayment = "INSERT INTO monthly_payments (monthly_plan_id, name_snapshot, amount, account_id, unit_price, quantity) VALUES ($1, 'Pool', $2, $3, $4, $5)"
+    await pg.query(insertPayment, [plan, 63000, account, 7000, 9])
+    await pg.query(insertPayment, [plan, 5000, account, null, null])
+    await expect(pg.query(insertPayment, [plan, 60000, account, 7000, 9])).rejects.toThrow()
+    await expect(pg.query(insertPayment, [plan, 7000, account, 7000, null])).rejects.toThrow()
+  } finally {
+    await pg.close()
+  }
+})

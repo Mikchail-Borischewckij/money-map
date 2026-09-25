@@ -1,10 +1,23 @@
-import { db } from './db'
+import { db, intArray } from './db'
 import type { Session } from './auth'
 import { calculateMoneyPlan, type MoneyPlan } from './money'
 import { planInput } from './validation'
+import { countWeekdays } from '../schedule'
 
 const monthText = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 const dayInMonth = (year: number, month: number, day: number | null) => day ? `${monthText(year, month)}-${String(Math.min(day, new Date(Date.UTC(year, month, 0)).getUTCDate())).padStart(2, '0')}` : null
+
+type PaymentTemplateRow = { default_amount: string | number; due_day: number | null; schedule: 'monthly' | 'weekly'; weekdays: number[] | null }
+
+// A weekly template turns into price × occurrences of its weekdays in the month; a monthly one keeps a fixed amount.
+function paymentSnapshot(year: number, month: number, template: PaymentTemplateRow) {
+  if (template.schedule === 'weekly' && template.weekdays) {
+    const unitPrice = Number(template.default_amount)
+    const quantity = countWeekdays(monthText(year, month), template.weekdays)
+    return { amount: unitPrice * quantity, unitPrice, quantity, weekdays: template.weekdays, dueDate: null }
+  }
+  return { amount: Number(template.default_amount), unitPrice: null, quantity: null, weekdays: null, dueDate: dayInMonth(year, month, template.due_day) }
+}
 
 export async function listPlans(session: Session) {
   const rows = await db()`SELECT id, year, month, status, version, updated_at, updated_by
@@ -37,7 +50,7 @@ export async function createPlan(session: Session, year: number, month: number) 
       WHERE i.household_id = ${session.householdId} AND i.is_archived = false AND a.is_archived = false
       AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
       AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
-    const payments = await tx`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, COALESCE(c.name, '') AS category
+    const payments = await tx`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, COALESCE(c.name, '') AS category
       FROM recurring_payments p JOIN payment_template_versions v ON v.recurring_payment_id = p.id
       JOIN accounts a ON a.id = v.account_id LEFT JOIN categories c ON c.id = v.category_id
       WHERE p.household_id = ${session.householdId} AND p.is_archived = false AND a.is_archived = false
@@ -46,9 +59,13 @@ export async function createPlan(session: Session, year: number, month: number) 
     for (const income of incomes) await tx`INSERT INTO monthly_incomes
       (monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date)
       VALUES (${planId}, ${income.id}, ${income.name}, ${income.default_amount}, ${income.account_id}, ${dayInMonth(year, month, income.expected_day)})`
-    for (const payment of payments) await tx`INSERT INTO monthly_payments
-      (monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date)
-      VALUES (${planId}, ${payment.id}, ${payment.name}, ${payment.category}, ${payment.default_amount}, ${payment.account_id}, ${dayInMonth(year, month, payment.due_day)})`
+    for (const payment of payments) {
+      const snapshot = paymentSnapshot(year, month, payment as unknown as PaymentTemplateRow)
+      await tx`INSERT INTO monthly_payments
+        (monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, schedule_snapshot, weekdays_snapshot, unit_price, quantity)
+        VALUES (${planId}, ${payment.id}, ${payment.name}, ${payment.category}, ${snapshot.amount}, ${payment.account_id}, ${snapshot.dueDate},
+          ${payment.schedule}, ${intArray(snapshot.weekdays)}::integer[], ${snapshot.unitPrice}, ${snapshot.quantity})`
+    }
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'MonthlyPlan', ${planId}, 'create', 1)`
     return planId
@@ -78,7 +95,9 @@ export async function readPlan(session: Session, id: string) {
       ORDER BY a.display_order, a.id`,
     db()`SELECT account_id, amount, is_confirmed, balance_date::text FROM account_balances WHERE monthly_plan_id = ${id}`,
     db()`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status FROM monthly_incomes WHERE monthly_plan_id = ${id} ORDER BY id`,
-    db()`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled FROM monthly_payments WHERE monthly_plan_id = ${id} ORDER BY id`,
+    db()`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled,
+      schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason
+      FROM monthly_payments WHERE monthly_plan_id = ${id} ORDER BY id`,
     db()`SELECT id, name, type, amount, account_id FROM allocations WHERE monthly_plan_id = ${id} ORDER BY id`,
   ])
   const balanceMap = new Map(balances.map((balance) => [balance.account_id, Number(balance.amount)]))
@@ -88,7 +107,7 @@ export async function readPlan(session: Session, id: string) {
     month: monthText(record.year, record.month),
     accounts: accounts.map((account) => ({ id: account.id, name: account.name, kind: account.type, openingBalance: balanceMap.get(account.id) ?? 0, balanceConfirmed: confirmationMap.get(account.id) ?? false, balanceDate: balanceDateMap.get(account.id) ?? null, canFundTransfers: account.can_fund_transfers, priority: account.transfer_priority, version: account.version, isArchived: account.is_archived })),
     incomes: incomes.map((income) => ({ id: income.id, recurringIncomeId: income.recurring_income_id, name: income.name_snapshot, amount: Number(income.amount), accountId: income.account_id, expectedOn: income.expected_date ?? '', enabled: income.is_enabled, status: income.status === 'Expected' ? 'expected' : income.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded' })),
-    payments: payments.map((payment) => ({ id: payment.id, recurringPaymentId: payment.recurring_payment_id, name: payment.name_snapshot, amount: Number(payment.amount), accountId: payment.account_id, due: payment.due_date ?? 'в течение месяца', enabled: payment.is_enabled, category: payment.category_snapshot })),
+    payments: payments.map((payment) => ({ id: payment.id, recurringPaymentId: payment.recurring_payment_id, name: payment.name_snapshot, amount: Number(payment.amount), accountId: payment.account_id, due: payment.due_date ?? 'в течение месяца', enabled: payment.is_enabled, category: payment.category_snapshot, schedule: payment.schedule_snapshot, weekdays: payment.weekdays_snapshot, unitPrice: payment.unit_price === null ? null : Number(payment.unit_price), quantity: payment.quantity, exclusionReason: payment.exclusion_reason })),
     allocations: allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, amount: Number(allocation.amount), accountId: allocation.account_id, kind: allocation.type })),
   }
   return { id: record.id as string, version: record.version as number, status: record.status as 'Draft' | 'Finalized', updatedAt: record.updated_at, updatedBy: record.updated_by_name, balanceDate: record.balance_date, plan, summary: calculateMoneyPlan(plan) }
@@ -131,8 +150,10 @@ export async function savePlan(session: Session, id: string, value: unknown) {
       (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version)
       VALUES (${income.id}, ${id}, ${income.recurringIncomeId ?? null}, ${income.name}, ${income.amount}, ${income.accountId}, ${income.expectedOn || null}, ${income.enabled}, ${income.status === 'expected' ? 'Expected' : income.status === 'included' ? 'IncludedInOpeningBalance' : 'Excluded'}, ${newVersion})`
     for (const payment of input.plan.payments) await tx`INSERT INTO monthly_payments
-      (id, monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, is_enabled, version)
-      VALUES (${payment.id}, ${id}, ${payment.recurringPaymentId ?? null}, ${payment.name}, ${payment.category}, ${payment.amount}, ${payment.accountId}, ${/^\d{4}-\d{2}-\d{2}$/.test(payment.due) ? payment.due : null}, ${payment.enabled}, ${newVersion})`
+      (id, monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, is_enabled, version,
+        schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason)
+      VALUES (${payment.id}, ${id}, ${payment.recurringPaymentId ?? null}, ${payment.name}, ${payment.category}, ${payment.amount}, ${payment.accountId}, ${/^\d{4}-\d{2}-\d{2}$/.test(payment.due) ? payment.due : null}, ${payment.enabled}, ${newVersion},
+        ${payment.recurringPaymentId ? payment.schedule ?? null : null}, ${intArray(payment.recurringPaymentId ? payment.weekdays : null)}::integer[], ${payment.unitPrice ?? null}, ${payment.quantity ?? null}, ${payment.enabled ? '' : payment.exclusionReason ?? ''})`
     for (const allocation of input.plan.allocations) await tx`INSERT INTO allocations
       (id, monthly_plan_id, name, type, amount, account_id, version)
       VALUES (${allocation.id}, ${id}, ${allocation.name}, ${allocation.kind}, ${allocation.amount}, ${allocation.accountId}, ${newVersion})`
@@ -174,7 +195,7 @@ export async function resetMonthlyPayment(session: Session, planId: string, paym
     const rows = await tx`SELECT recurring_payment_id FROM monthly_payments WHERE id = ${paymentId} AND monthly_plan_id = ${planId}`
     if (!rows[0]?.recurring_payment_id) return 'missing'
     const first = `${monthText(plans[0].year, plans[0].month)}-01`
-    const versions = await tx`SELECT v.name, v.default_amount, v.account_id, v.due_day, COALESCE(c.name, '') AS category
+    const versions = await tx`SELECT v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, COALESCE(c.name, '') AS category
       FROM recurring_payments p JOIN payment_template_versions v ON v.recurring_payment_id = p.id
       LEFT JOIN categories c ON c.id = v.category_id
       WHERE p.id = ${rows[0].recurring_payment_id} AND p.household_id = ${session.householdId}
@@ -182,9 +203,12 @@ export async function resetMonthlyPayment(session: Session, planId: string, paym
       LIMIT 1`
     if (!versions[0]) return 'missing'
     const version = versions[0]
+    const snapshot = paymentSnapshot(plans[0].year, plans[0].month, version as unknown as PaymentTemplateRow)
     const newVersion = expectedVersion + 1
     await tx`UPDATE monthly_payments SET name_snapshot = ${version.name}, category_snapshot = ${version.category},
-      amount = ${version.default_amount}, account_id = ${version.account_id}, due_date = ${dayInMonth(plans[0].year, plans[0].month, version.due_day)},
+      amount = ${snapshot.amount}, account_id = ${version.account_id}, due_date = ${snapshot.dueDate},
+      schedule_snapshot = ${version.schedule}, weekdays_snapshot = ${intArray(snapshot.weekdays)}::integer[],
+      unit_price = ${snapshot.unitPrice}, quantity = ${snapshot.quantity}, exclusion_reason = '',
       is_enabled = true, version = ${newVersion} WHERE id = ${paymentId}`
     await tx`UPDATE monthly_plans SET version = ${newVersion}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${planId}`
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)

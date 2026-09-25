@@ -15,3 +15,6 @@ export function db() {
   }
   return client
 }
+
+// Integer arrays are sent as literals with an explicit cast; with prepare: false postgres.js cannot infer the parameter type.
+export const intArray = (values: number[] | null | undefined) => values ? `{${values.map((value) => Math.trunc(value)).join(',')}}` : null

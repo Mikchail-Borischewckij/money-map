@@ -33,6 +33,11 @@ export type Payment = {
   enabled: boolean
   category: string
   recurringPaymentId?: string | null
+  schedule?: 'monthly' | 'weekly' | null
+  weekdays?: number[] | null
+  unitPrice?: number | null
+  quantity?: number | null
+  exclusionReason?: string
 }
 
 export type Allocation = {

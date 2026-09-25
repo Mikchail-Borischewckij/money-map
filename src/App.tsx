@@ -9,6 +9,8 @@ import {
 import { calculatePlan, type Account, type Income, type Payment, type Plan } from './domain'
 import { toApiPlan, toUiPlan, toUiSummary, type ServerRecord } from './api-client'
 import TemplatesPage from './TemplatesPage'
+import PaymentsPage from './PaymentsPage'
+import { AmountInput } from './fields'
 import './App.css'
 
 type View = 'overview' | 'income' | 'payments' | 'accounts' | 'history' | 'templates'
@@ -29,7 +31,6 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
   const [view, setView] = useState<View>('overview')
   const [mobileNav, setMobileNav] = useState(false)
   const [addIncome, setAddIncome] = useState(false)
-  const [addPayment, setAddPayment] = useState(false)
   const savedSnapshot = useRef(JSON.stringify(toUiPlan(initial.plan)))
   const versionRef = useRef(initial.version)
   const savingRef = useRef(false)
@@ -157,6 +158,8 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
   const accountName = (id: string) => plan.accounts.find((account) => account.id === id)?.name ?? 'Неизвестный счёт'
   const updateIncome = (id: string, patch: Partial<Income>) => setPlan((current) => ({ ...current, incomes: current.incomes.map((item) => item.id === id ? { ...item, ...patch } : item) }))
   const updatePayment = (id: string, patch: Partial<Payment>) => setPlan((current) => ({ ...current, payments: current.payments.map((item) => item.id === id ? { ...item, ...patch } : item) }))
+  const removePayment = (id: string) => setPlan((current) => ({ ...current, payments: current.payments.filter((item) => item.id !== id) }))
+  const addPayment = (payment: Payment) => setPlan((current) => ({ ...current, payments: [...current.payments, payment] }))
 
   return <div className="app-shell">
     <aside className={mobileNav ? 'sidebar sidebar-open' : 'sidebar'}>
@@ -168,7 +171,7 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
         <button className={view === 'payments' ? 'nav-item active' : 'nav-item'} onClick={() => go('payments')}><ReceiptText />Платежи</button>
         <button className={view === 'accounts' ? 'nav-item active' : 'nav-item'} onClick={() => go('accounts')}><WalletCards />Счета</button>
         <button className={view === 'history' ? 'nav-item active' : 'nav-item'} onClick={() => go('history')}><CalendarDays />История месяцев</button>
-        <button className={view === 'templates' ? 'nav-item active' : 'nav-item'} onClick={() => go('templates')}><Settings />Регулярные статьи</button>
+        <button className={view === 'templates' ? 'nav-item active' : 'nav-item'} onClick={() => go('templates')}><Settings />Справочник</button>
       </nav>
       <div className="sidebar-bottom">
         <button className="nav-item muted" onClick={() => void logout()}><Settings />Выйти</button>
@@ -192,10 +195,7 @@ function App({ initial, csrfToken, displayName }: { initial: ServerRecord; csrfT
           {addIncome && <IncomeForm accounts={plan.accounts} month={plan.month} onCancel={() => setAddIncome(false)} onSave={(income) => { setPlan({ ...plan, incomes: [...plan.incomes, income] }); setAddIncome(false) }} />}
           <div className="ledger-list">{plan.incomes.map((income) => <IncomeRow key={income.id} income={income} accounts={plan.accounts} onChange={(patch) => updateIncome(income.id, patch)} onReset={() => void resetIncome(income.id)} />)}</div>
         </LedgerPage>}
-        {view === 'payments' && <LedgerPage title="Платежи месяца" subtitle="Изменение суммы или отключение относится только к выбранному месяцу." action="Добавить платёж" onAdd={() => setAddPayment(true)}>
-          {addPayment && <PaymentForm accounts={plan.accounts} onCancel={() => setAddPayment(false)} onSave={(payment) => { setPlan({ ...plan, payments: [...plan.payments, payment] }); setAddPayment(false) }} />}
-          <div className="ledger-list">{plan.payments.map((payment) => <PaymentRow key={payment.id} payment={payment} accounts={plan.accounts} onChange={(patch) => updatePayment(payment.id, patch)} onReset={() => void resetPayment(payment.id)} />)}</div>
-        </LedgerPage>}
+        {view === 'payments' && <PaymentsPage plan={plan} csrfToken={csrfToken} onAdd={addPayment} onChange={updatePayment} onRemove={removePayment} onReset={(id) => void resetPayment(id)} />}
         {view === 'accounts' && <AccountsPage plan={plan} setPlan={setPlan} onAdd={addAccount} onUpdate={updateAccount} onArchive={archiveAccount} />}
         </fieldset>
         {view === 'history' && <section className="panel ledger-panel"><h1>История месяцев</h1>{history.map((item) => <button className="history-row" key={item.id} onClick={() => void selectMonth(`${item.year}-${String(item.month).padStart(2, '0')}`)}><strong>{monthLabel(`${item.year}-${String(item.month).padStart(2, '0')}`)}</strong><span>{item.status === 'Finalized' ? 'Зафиксирован' : 'Черновик'} · доступно {money(item.totalAvailable / 100)} · платежи {money(item.totalPayments / 100)} · накопления {money(item.totalSavings / 100)} · свободно {money(item.freeAfterPlan / 100)}</span><small>{new Date(item.updated_at).toLocaleString('ru-RU')}</small></button>)}</section>}
@@ -219,7 +219,7 @@ function Overview({ plan, setPlan, summary, accountName, onNextMonth }: { plan: 
     <section className="page-heading"><div><span className="eyebrow">ПЛАН НА {monthLabel(plan.month).toUpperCase()}</span><h1>Деньги разложены<br />по своим местам.</h1></div><button className="secondary-button" onClick={onNextMonth}><Plus />Следующий месяц</button></section>
     <section className="summary-grid">
       <article className={summary.freeAfterPlan >= 0 ? 'hero-card' : 'hero-card deficit'}><div className="card-kicker">{summary.isPreliminary ? 'Предварительно свободно' : 'Свободно после плана'}</div><strong>{money(summary.freeAfterPlan)}</strong><p>{summary.isPreliminary ? 'Подтвердите начальные остатки на всех счетах' : summary.freeAfterPlan >= 0 ? 'Можно направить на другие расходы' : 'Нужно сократить план или добавить доход'}</p><ArrowUpRight /></article>
-      <article className="metric-card"><div className="metric-icon lavender"><ReceiptText /></div><div><span>Постоянные платежи</span><strong>{money(summary.totalPayments)}</strong><small>{plan.payments.filter((item) => item.enabled).length} активных</small></div></article>
+      <article className="metric-card"><div className="metric-icon lavender"><ReceiptText /></div><div><span>Платежи месяца</span><strong>{money(summary.totalPayments)}</strong><small>{plan.payments.filter((item) => item.enabled && item.recurringPaymentId).length} регулярных · {plan.payments.filter((item) => item.enabled && !item.recurringPaymentId).length} разовых</small></div></article>
       <article className="metric-card"><div className="metric-icon sand"><PiggyBank /></div><div><span>Накопления</span><strong>{money(summary.totalSavings)}</strong><small>Запланировано</small></div></article>
     </section>
     {plan.accounts.length === 0 && <div className="warning"><ShieldCheck /><span>Начните со счёта во вкладке «Счета».</span></div>}
@@ -241,26 +241,15 @@ function Overview({ plan, setPlan, summary, accountName, onNextMonth }: { plan: 
   </>
 }
 
-function AmountInput({ value, onChange, label }: { value: number; onChange: (value: number) => void; label: string }) {
-  const [focused, setFocused] = useState(false)
-  const [draft, setDraft] = useState(String(value))
-  return <input aria-label={label} type="text" inputMode="decimal" value={focused ? draft : String(value)} onFocus={() => { setDraft(String(value)); setFocused(true) }} onBlur={() => setFocused(false)} onChange={(event) => {
-    const raw = event.target.value
-    if (!/^\d*([.,]\d{0,2})?$/.test(raw)) return
-    setDraft(raw)
-    const amount = Number(raw.replace(',', '.'))
-    if (Number.isFinite(amount)) onChange(amount)
-  }} />
-}
 function MoneyField({ label, value, onChange, note }: { label: string; value: number; onChange: (value: number) => void; note: string }) { return <label className="money-field"><span><strong>{label}</strong><small>{note}</small></span><div><AmountInput label={label} value={value} onChange={onChange} /><span>zł</span></div></label> }
 function LedgerPage({ title, subtitle, action, onAdd, children }: { title: string; subtitle: string; action: string; onAdd: () => void; children: React.ReactNode }) { return <><section className="page-heading compact"><div><span className="eyebrow">ТЕКУЩИЙ МЕСЯЦ</span><h1>{title}</h1><p>{subtitle}</p></div><button className="primary-button" onClick={onAdd}><Plus />{action}</button></section><section className="panel ledger-panel">{children}</section></> }
 function IncomeRow({ income, accounts, onChange, onReset }: { income: Income; accounts: Plan['accounts']; onChange: (patch: Partial<Income>) => void; onReset: () => void }) {
-  return <div className={income.enabled ? 'ledger-row' : 'ledger-row disabled'}>
-    <label className="switch"><input aria-label={`Включить ${income.name}`} type="checkbox" checked={income.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} /><span /></label>
+  const status = income.enabled ? income.status : 'excluded'
+  return <div className={status === 'excluded' ? 'ledger-row no-switch disabled' : 'ledger-row no-switch'}>
     <div className="ledger-main">
       <input aria-label="Название дохода" value={income.name} onChange={(event) => onChange({ name: event.target.value })} />
       <div className="row-details">
-        <select aria-label="Статус дохода" value={income.status} onChange={(event) => onChange({ status: event.target.value as Income['status'] })}><option value="expected">Ожидается</option><option value="included">Уже в остатке</option><option value="excluded">Исключён</option></select>
+        <select aria-label="Статус дохода" value={status} onChange={(event) => onChange({ status: event.target.value as Income['status'], enabled: true })}><option value="expected">Ожидается</option><option value="included">Уже в остатке</option><option value="excluded">Не будет в этом месяце</option></select>
         <input aria-label="Ожидаемая дата" type="date" value={income.expectedOn} onChange={(event) => onChange({ expectedOn: event.target.value })} />
       </div>
       {income.recurringIncomeId && <button className="reset-link" type="button" onClick={onReset}>Вернуть базовые значения</button>}
@@ -269,29 +258,10 @@ function IncomeRow({ income, accounts, onChange, onReset }: { income: Income; ac
     <div className="amount-input"><AmountInput label="Сумма дохода" value={income.amount} onChange={(amount) => onChange({ amount })} /><span>zł</span></div>
   </div>
 }
-function PaymentRow({ payment, accounts, onChange, onReset }: { payment: Payment; accounts: Plan['accounts']; onChange: (patch: Partial<Payment>) => void; onReset: () => void }) {
-  return <div className={payment.enabled ? 'ledger-row' : 'ledger-row disabled'}>
-    <label className="switch"><input aria-label={`Включить ${payment.name}`} type="checkbox" checked={payment.enabled} onChange={(event) => onChange({ enabled: event.target.checked })} /><span /></label>
-    <div className="ledger-main">
-      <input aria-label="Название платежа" value={payment.name} onChange={(event) => onChange({ name: event.target.value })} />
-      <div className="row-details">
-        <input aria-label="Категория" value={payment.category} onChange={(event) => onChange({ category: event.target.value })} />
-        <input aria-label="Дата платежа" type="date" value={/^\d{4}-\d{2}-\d{2}$/.test(payment.due) ? payment.due : ''} onChange={(event) => onChange({ due: event.target.value || 'в течение месяца' })} />
-      </div>
-      {payment.recurringPaymentId && <button className="reset-link" type="button" onClick={onReset}>Вернуть базовые значения</button>}
-    </div>
-    <select aria-label="Счёт платежа" value={payment.accountId} onChange={(event) => onChange({ accountId: event.target.value })}>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select>
-    <div className="amount-input"><AmountInput label="Сумма платежа" value={payment.amount} onChange={(amount) => onChange({ amount })} /><span>zł</span></div>
-  </div>
-}
 
 function IncomeForm({ accounts, month, onCancel, onSave }: { accounts: Plan['accounts']; month: string; onCancel: () => void; onSave: (income: Income) => void }) {
   const [name, setName] = useState(''); const [amount, setAmount] = useState(0); const [accountId, setAccountId] = useState(accounts.find((account) => !account.isArchived)?.id ?? ''); const [expectedOn, setExpectedOn] = useState(`${month}-01`)
   return <form className="inline-form" onSubmit={(e) => { e.preventDefault(); if (!name.trim() || !accountId) return; onSave({ id: crypto.randomUUID(), name: name.trim(), amount, accountId, expectedOn, enabled: true, status: 'expected' }) }}><input required placeholder="Название дохода" value={name} onChange={(e) => setName(e.target.value)} /><AmountInput label="Сумма дохода" value={amount} onChange={setAmount} /><input aria-label="Ожидаемая дата" type="date" value={expectedOn} onChange={(e) => setExpectedOn(e.target.value)} /><select value={accountId} onChange={(e) => setAccountId(e.target.value)}>{accounts.filter((account) => !account.isArchived).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><button className="primary-button" type="submit">Добавить</button><button className="icon-button" type="button" onClick={onCancel}><X /></button></form>
-}
-function PaymentForm({ accounts, onCancel, onSave }: { accounts: Plan['accounts']; onCancel: () => void; onSave: (payment: Payment) => void }) {
-  const [name, setName] = useState(''); const [amount, setAmount] = useState(0); const [accountId, setAccountId] = useState(accounts.find((account) => !account.isArchived)?.id ?? '')
-  return <form className="inline-form" onSubmit={(e) => { e.preventDefault(); if (!name.trim() || !accountId) return; onSave({ id: crypto.randomUUID(), name: name.trim(), amount, accountId, due: 'в течение месяца', enabled: true, category: 'Другое' }) }}><input required placeholder="Название платежа" value={name} onChange={(e) => setName(e.target.value)} /><AmountInput label="Сумма платежа" value={amount} onChange={setAmount} /><select value={accountId} onChange={(e) => setAccountId(e.target.value)}>{accounts.filter((account) => !account.isArchived).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><button className="primary-button" type="submit">Добавить</button><button className="icon-button" type="button" onClick={onCancel}><X /></button></form>
 }
 function AccountsPage({ plan, setPlan, onAdd, onUpdate, onArchive }: { plan: Plan; setPlan: (plan: Plan) => void; onAdd: (name: string, kind: Account['kind']) => Promise<void>; onUpdate: (id: string, patch: Partial<Account>) => Promise<void>; onArchive: (id: string) => Promise<void> }) {
   const [name, setName] = useState('')

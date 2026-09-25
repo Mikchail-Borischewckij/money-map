@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const moneySchema = z.number().int().min(0).max(9_000_000_000_000)
 export const uuid = z.string().uuid()
 const name = z.string().trim().min(1).max(160)
+const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7).refine((days) => new Set(days).size === days.length, { message: 'Duplicate weekday' })
 
 export const accountInput = z.object({
   name,
@@ -21,7 +22,11 @@ const income = z.object({
 const payment = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
   due: z.string().max(80), enabled: z.boolean(), category: z.string().max(100), recurringPaymentId: uuid.nullable().optional(),
-})
+  schedule: z.enum(['monthly', 'weekly']).nullable().optional(), weekdays: weekdays.nullable().optional(),
+  unitPrice: moneySchema.nullable().optional(), quantity: z.number().int().min(0).max(1000).nullable().optional(),
+  exclusionReason: z.string().max(200).optional(),
+}).refine((value) => (value.unitPrice == null) === (value.quantity == null), { message: 'Unit price and quantity go together' })
+  .refine((value) => value.unitPrice == null || value.amount === value.unitPrice * value.quantity!, { message: 'Amount must equal unit price × quantity' })
 const allocation = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
   kind: z.enum(['living', 'savings', 'other']),
@@ -47,4 +52,6 @@ export const templateInput = z.object({
   day: z.number().int().min(1).max(31).nullable(),
   activeFrom: z.iso.date(), activeTo: z.iso.date().nullable(),
   categoryId: uuid.nullable().optional(), version: z.number().int().positive().optional(),
+  schedule: z.enum(['monthly', 'weekly']).default('monthly'), weekdays: weekdays.nullable().default(null),
 }).refine((value) => !value.activeTo || value.activeTo >= value.activeFrom, { message: 'End date must follow start date' })
+  .refine((value) => value.schedule === 'weekly' ? value.weekdays !== null && value.day === null : value.weekdays === null, { message: 'Weekly schedule needs weekdays and no day' })
