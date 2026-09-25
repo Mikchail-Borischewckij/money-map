@@ -19,8 +19,9 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
       {accounts.map((account) => <div className="row" key={account.id}>
         <div className="row-main"><strong><AccountBadge name={account.name} hue={accountHue(plan.accounts, account.id)} /></strong><span className="row-meta">{kindLabel[account.kind]}</span></div>
         <div className="row-side">
-          <Amount label={`Остаток: ${account.name}`} value={account.openingBalance} readOnly={readOnly}
-            onChange={(openingBalance) => change(account.id, { openingBalance, balanceConfirmed: true, balanceDate: today() })} />
+          {/* A checked balance is locked; uncheck it to correct the amount. */}
+          <Amount label={`Остаток: ${account.name}`} value={account.openingBalance} readOnly={readOnly || Boolean(account.balanceConfirmed)} className="amount-locked"
+            onChange={(openingBalance) => change(account.id, { openingBalance })} />
           {readOnly
             ? <Badge tone={account.balanceConfirmed ? 'ok' : 'warn'}>{account.balanceConfirmed ? 'Проверено' : 'Не проверено'}</Badge>
             : <Checkbox checked={account.balanceConfirmed ?? false} onChange={(balanceConfirmed) => change(account.id, { balanceConfirmed, balanceDate: balanceConfirmed ? today() : null })}>Проверено</Checkbox>}
