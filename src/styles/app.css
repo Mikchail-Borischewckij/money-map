@@ -96,6 +96,7 @@
 .money-table th:first-child { padding-left: 0; text-align: left; white-space: normal; }
 .money-table td:last-child, .money-table th:last-child { padding-right: 0; }
 .money-table thead th { border-top: 0; padding-top: 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; color: var(--muted); }
+.money-table thead th small { display: block; font-weight: 400; text-transform: none; letter-spacing: 0; }
 .money-table tbody th { font-weight: 600; }
 .money-table tbody th small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
 .money-table tfoot th, .money-table tfoot td { border-top: 2px solid var(--border-strong); font-weight: 700; }

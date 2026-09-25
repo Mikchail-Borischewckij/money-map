@@ -5,7 +5,7 @@ import Section from './Section'
 
 const signed = (value: number) => value === 0 ? '—' : `${value > 0 ? '+' : '−'} ${amount(Math.abs(value))}`
 
-// Per account: what it has, what leaves it, the transfers in or out and what stays; then the transfers to make, in order.
+// Per account: what it has, what its payments need, how much to move in (+) or out (−) and what stays; then the transfers to make, in order.
 export default function TransfersSection({ step, summary, accountTag }: { step: number; summary: PlanSummary; accountTag: (id: string) => React.ReactNode }) {
   const accounts = summary.accounts.filter((account) => !account.isArchived || account.available || account.needed || account.incoming || account.outgoing)
   if (accounts.length === 0) return null
@@ -13,7 +13,13 @@ export default function TransfersSection({ step, summary, accountTag }: { step: 
   return <Section step={step} title="Счета и переводы" id="transfers" meta={<span>в zł</span>}>
     <div className="table-scroll">
       <table className="money-table">
-        <thead><tr><th>Счёт</th><th>Есть и придёт</th><th>Уйдёт</th><th>Перевод</th><th>Останется</th></tr></thead>
+        <thead><tr>
+          <th>Счёт</th>
+          <th>На счёту<small>(есть и придёт)</small></th>
+          <th>Необходимо<small>на платежи</small></th>
+          <th>Доперевести<small>+ сюда / − отсюда</small></th>
+          <th>Останется</th>
+        </tr></thead>
         <tbody>
           {accounts.map((account) => <tr key={account.id}>
             <th scope="row">{accountTag(account.id)}{account.keep > 0 && <small>запас {amount(account.keep)}</small>}</th>
