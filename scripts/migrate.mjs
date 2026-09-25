@@ -9,8 +9,15 @@ if (process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'production') {
 
 // Vercel builds have no IPv6, so the Supabase direct connection is unreachable there.
 // MIGRATION_DATABASE_URL should be the Session pooler string; the Transaction pooler is not suitable for DDL.
-const connection = process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL
+const source = process.env.MIGRATION_DATABASE_URL ? 'MIGRATION_DATABASE_URL' : 'DATABASE_URL'
+const connection = process.env[source]
 if (!connection) throw new Error('MIGRATION_DATABASE_URL or DATABASE_URL is required')
+
+const { hostname, port } = new URL(connection)
+console.log(`Migrating via ${source} at ${hostname}:${port || 5432}`)
+if (process.env.VERCEL && /^db\..+\.supabase\.co$/.test(hostname)) {
+  throw new Error(`${source} points to the IPv6-only Supabase direct connection; use the Session pooler string (*.pooler.supabase.com:5432)`)
+}
 
 const sql = postgres(connection, {
   ssl: process.env.DATABASE_SSL === 'disable' ? false : 'require',
