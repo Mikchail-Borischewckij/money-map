@@ -13,8 +13,10 @@ export default function CategoriesTab({ categories, csrfToken, run }: { categori
   const [showArchived, setShowArchived] = useState(false)
   const active = categories.filter((category) => !category.is_archived)
   const archived = categories.filter((category) => category.is_archived)
-  const add = () => { if (!name.trim()) return; void run(() => send('/api/categories', 'POST', csrfToken, { name: name.trim() }), 'Категория добавлена.'); setName('') }
-  const update = (category: Category, patch: Partial<Category>) => run(() => send(`/api/categories/${category.id}`, 'PUT', csrfToken, { name: patch.name ?? category.name, isArchived: patch.is_archived ?? category.is_archived, version: category.version }), 'Сохранено.')
+  const add = () => { if (!name.trim()) return; void run(() => send('/api/categories', 'POST', csrfToken, { name: name.trim() }), 'Категория добавлена.',
+    (lists) => ({ ...lists, categories: [...lists.categories, { id: `new-${crypto.randomUUID()}`, name: name.trim(), is_archived: false, version: 0 }] })); setName('') }
+  const update = (category: Category, patch: Partial<Category>) => run(() => send(`/api/categories/${category.id}`, 'PUT', csrfToken, { name: patch.name ?? category.name, isArchived: patch.is_archived ?? category.is_archived, version: category.version }), 'Сохранено.',
+    (lists) => ({ ...lists, categories: lists.categories.map((item) => item.id === category.id ? { ...item, ...patch } : item) }))
   return <section className="card">
     <header className="card-head"><div><h2>Категории</h2><p className="muted">Для группировки платежей.</p></div></header>
     <form className="inline-add" onSubmit={(event) => { event.preventDefault(); add() }}>

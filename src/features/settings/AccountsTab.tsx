@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
 import { Button, Empty, RowMenu } from '@/components/ui'
 import AccountDialog, { type AccountValue } from './AccountDialog'
 import { send } from './api'
-import { kindOptions, type AccountRow, type Run } from './types'
+import { kindOptions, type AccountRow, type Preview, type Run } from './types'
 
 const body = (account: AccountRow, patch: Partial<AccountRow>) => {
   const next = { ...account, ...patch }
@@ -19,15 +19,15 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
   const archived = accounts.filter((account) => account.is_archived)
 
   // List order is the order money is taken for transfers; everyone is renumbered so the move is unambiguous.
-  const move = (index: number, delta: number) => run(async () => {
+  const patch = (id: string, change: Partial<AccountRow>): Preview => (lists) => ({ ...lists, accounts: lists.accounts.map((account) => account.id === id ? { ...account, ...change } : account) })
+  const move = (index: number, delta: number) => {
     const order = [...active]
     const [item] = order.splice(index, 1)
     order.splice(index + delta, 0, item)
-    for (const [position, account] of order.entries()) {
-      const priority = (position + 1) * 10
-      if (account.transfer_priority !== priority) await send(`/api/accounts/${account.id}`, 'PUT', csrfToken, body(account, { transfer_priority: priority }))
-    }
-  }, 'Порядок сохранён.')
+    const changes = order.map((account, position) => ({ account, priority: (position + 1) * 10 })).filter(({ account, priority }) => account.transfer_priority !== priority)
+    return run(() => Promise.all(changes.map(({ account, priority }) => send(`/api/accounts/${account.id}`, 'PUT', csrfToken, body(account, { transfer_priority: priority })))), 'Порядок сохранён.',
+      (lists) => ({ ...lists, accounts: lists.accounts.map((account) => ({ ...account, transfer_priority: changes.find((change) => change.account.id === account.id)?.priority ?? account.transfer_priority })) }))
+  }
 
   const save = (value: AccountValue) => {
     const current = editing === 'new' ? null : editing
@@ -35,7 +35,9 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     void run(() => current
       ? send(`/api/accounts/${current.id}`, 'PUT', csrfToken, body(current, { name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers }))
       : send('/api/accounts', 'POST', csrfToken, { name: value.name, kind: value.kind, canFundTransfers: value.canFundTransfers, priority: (active.length + 1) * 10 }),
-    current ? 'Счёт сохранён.' : 'Счёт добавлен.')
+    current ? 'Счёт сохранён.' : 'Счёт добавлен.',
+    current ? patch(current.id, { name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers })
+      : (lists) => ({ ...lists, accounts: [...lists.accounts, { id: `new-${crypto.randomUUID()}`, name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers, transfer_priority: (active.length + 1) * 10, is_archived: false, version: 0 }] }))
   }
 
   return <section className="card">
@@ -50,7 +52,7 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
           <Button variant="ghost" size="sm" aria-label={`Ниже: ${account.name}`} icon={<ArrowDown size={16} />} disabled={index === active.length - 1} onClick={() => void move(index, 1)} />
           <RowMenu label={`Действия: ${account.name}`} items={[
             { label: 'Изменить', onSelect: () => setEditing(account) },
-            { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.') },
+            { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
           ]} />
         </div>
       </div>)}

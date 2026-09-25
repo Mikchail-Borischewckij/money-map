@@ -12,7 +12,10 @@ export type Category = { id: string; name: string; is_archived: boolean; version
 export type TemplateKind = 'payment' | 'income'
 export type TemplateForm = { name: string; amount: number; accountId: string; day: number | null; categoryId: string; schedule: PaymentSchedule; weekdays: number[]; amountVaries: boolean }
 
+export type Lists = { accounts: AccountRow[]; payments: Template[]; incomes: Template[]; categories: Category[] }
+// How the lists look right after a change, shown before the server answers.
+export type Preview = (lists: Lists) => Lists
 // Runs a settings change, then reloads the lists and shows the message.
-export type Run = (action: () => Promise<unknown>, done: string) => Promise<void>
+export type Run = (action: () => Promise<unknown>, done: string, preview?: Preview) => Promise<void>
 
 export const kindOptions: Option<AccountKind>[] = [{ value: 'current', label: 'Текущий' }, { value: 'savings', label: 'Накопительный' }, { value: 'cash', label: 'Наличные' }]

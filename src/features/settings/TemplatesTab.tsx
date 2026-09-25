@@ -8,7 +8,7 @@ import { money } from '@/lib/format'
 import { weekdayLabel } from '@/lib/schedule'
 import { send } from './api'
 import TemplateDialog from './TemplateDialog'
-import type { AccountRow, Category, Run, Template, TemplateForm, TemplateKind } from './types'
+import type { AccountRow, Category, Preview, Run, Template, TemplateForm, TemplateKind } from './types'
 
 const scheduleText = (item: Template) => item.schedule === 'weekly' && item.weekdays ? weekdayLabel(item.weekdays) : item.day ? `${item.day}‑е число` : 'Каждый месяц'
 const formOf = (item: Template): TemplateForm => ({ name: item.name, amount: Number(item.default_amount) / 100, accountId: item.account_id, day: item.day, categoryId: item.category_id ?? '', schedule: item.schedule ?? 'monthly', weekdays: item.weekdays ?? [], amountVaries: item.amount_varies ?? false })
@@ -30,6 +30,15 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
     ...(kind === 'payment' ? { categoryId: value.categoryId || null, schedule: value.schedule, weekdays: value.schedule === 'weekly' ? value.weekdays : null } : { amountVaries: value.amountVaries }),
   })
 
+  const list = kind === 'income' ? 'incomes' : 'payments'
+  const asTemplate = (value: TemplateForm, base: Partial<Template>): Template => ({
+    id: `new-${crypto.randomUUID()}`, active_to: null, is_archived: false, version: 0, ...base,
+    name: value.name, default_amount: String(toCents(value.amount)), account_id: value.accountId, day: value.schedule === 'weekly' ? null : value.day,
+    category_id: value.categoryId || null, schedule: value.schedule, weekdays: value.schedule === 'weekly' ? value.weekdays : null, amount_varies: value.amountVaries,
+  })
+  const preview = (change: (items: Template[]) => Template[]): Preview => (lists) => ({ ...lists, [list]: change(lists[list]) })
+  const patchItem = (id: string, patch: Partial<Template>) => preview((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item))
+
   const row = (item: Template, isPast: boolean) => {
     const amount = Number(item.default_amount) / 100
     const detail = [scheduleText(item), accountName(item.account_id), kind === 'payment' ? categoryName(item.category_id) : item.amount_varies ? 'сумма меняется' : ''].filter(Boolean).join(' · ')
@@ -39,10 +48,10 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
       <div className="row-side">
         <strong className="amount">{item.schedule === 'weekly' ? `${money(amount)} за раз` : money(amount)}</strong>
         <RowMenu label={`Действия: ${item.name}`} items={isPast || lastMonth
-          ? [{ label: 'Снова нужен', onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, false)), 'Снова действует.') }]
+          ? [{ label: 'Снова нужен', onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, false)), 'Снова действует.', patchItem(item.id, { active_to: null, is_archived: false })) }]
           : [
             { label: 'Изменить', onSelect: () => setEditing(item) },
-            { label: 'Больше не нужен', danger: true, onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, true)), 'Готово. В этом месяце остаётся, в следующие не попадёт.') },
+            { label: 'Больше не нужен', danger: true, onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, true)), 'Готово. В этом месяце остаётся, в следующие не попадёт.', patchItem(item.id, { active_to: today })) },
           ]} />
       </div>
     </div>
@@ -51,7 +60,8 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
   const save = (value: TemplateForm) => {
     const target = editing === 'new' ? null : editing
     setEditing(null)
-    void run(() => target ? send(`${url}/${target.id}`, 'PUT', csrfToken, payload(value, target.version)) : send(url, 'POST', csrfToken, payload(value)), target ? 'Сохранено.' : 'Добавлено.')
+    void run(() => target ? send(`${url}/${target.id}`, 'PUT', csrfToken, payload(value, target.version)) : send(url, 'POST', csrfToken, payload(value)), target ? 'Сохранено.' : 'Добавлено.',
+      target ? patchItem(target.id, asTemplate(value, target)) : preview((items) => [...items, asTemplate(value, {})]))
   }
 
   return <section className="card">

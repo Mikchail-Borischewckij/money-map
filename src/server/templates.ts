@@ -51,18 +51,16 @@ export async function listTemplates(session: Session, kind: TemplateKind) {
 }
 
 async function referencesValid(session: Session, value: TemplateValue) {
-  const account = await db()`SELECT id FROM accounts WHERE id = ${value.accountId} AND household_id = ${session.householdId} AND is_archived = false`
-  if (!account[0]) return false
-  if (value.categoryId) {
-    const category = await db()`SELECT id FROM categories WHERE id = ${value.categoryId} AND household_id = ${session.householdId} AND is_archived = false`
-    if (!category[0]) return false
-  }
-  return true
+  const [account, category] = await Promise.all([
+    db()`SELECT id FROM accounts WHERE id = ${value.accountId} AND household_id = ${session.householdId} AND is_archived = false`,
+    value.categoryId ? db()`SELECT id FROM categories WHERE id = ${value.categoryId} AND household_id = ${session.householdId} AND is_archived = false` : Promise.resolve([true]),
+  ])
+  return Boolean(account[0] && category[0])
 }
 
 export async function createTemplate(session: Session, kind: TemplateKind, input: TemplateValue) {
-  if (!await referencesValid(session, input)) return null
-  const window = await settingsWindow(session)
+  const [valid, window] = await Promise.all([referencesValid(session, input), settingsWindow(session)])
+  if (!valid) return null
   const value = { ...input, activeFrom: window.effectiveFrom, activeTo: input.ended ? window.endDate : null }
   if (value.activeTo && value.activeTo < value.activeFrom) return null
   return db().begin(async (transaction) => {
@@ -91,8 +89,9 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
 
 export async function updateTemplate(session: Session, kind: TemplateKind, id: string, input: TemplateValue) {
   const version = input.version
-  if (!version || !await referencesValid(session, input)) return null
-  const window = await settingsWindow(session)
+  if (!version) return null
+  const [valid, window] = await Promise.all([referencesValid(session, input), settingsWindow(session)])
+  if (!valid) return null
   return db().begin(async (transaction) => {
     const tx = transaction as unknown as Sql
     const plan = await lockOpenPlan(tx, session.householdId)

@@ -55,13 +55,13 @@ const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 // Closed months are never touched: only the single open month is read and written here.
 export async function applyToOpenMonth(tx: Sql, session: Session, kind: Kind, id: string, plan: OpenPlan | null, before: PaymentTemplate | IncomeTemplate | null) {
   if (!plan) return ''
-  const after = await templateAt(tx, kind, id, plan)
+  const [after, existing] = await Promise.all([templateAt(tx, kind, id, plan), kind === 'payment' ? paymentRow(tx, plan.id, id) : incomeRow(tx, plan.id, id)])
   if (!after) return ''
   const version = plan.version + 1
   let changed = false
   let kept: string[] = []
   if (kind === 'payment') {
-    const row = await paymentRow(tx, plan.id, id)
+    const row = existing as MoneyPayment | null
     const merge = mergePayment(monthText(plan), row, before as PaymentTemplate | null, after as PaymentTemplate)
     kept = merge.kept
     const value = merge.value
@@ -77,7 +77,7 @@ export async function applyToOpenMonth(tx: Sql, session: Session, kind: Kind, id
       changed = true
     }
   } else {
-    const row = await incomeRow(tx, plan.id, id)
+    const row = existing as MoneyIncome | null
     const merge = mergeIncome(monthText(plan), row, before as IncomeTemplate | null, after as IncomeTemplate)
     kept = merge.kept
     const value = merge.value
@@ -90,11 +90,11 @@ export async function applyToOpenMonth(tx: Sql, session: Session, kind: Kind, id
       changed = true
     }
   }
-  if (changed) {
-    await tx`UPDATE monthly_plans SET version = ${version}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${plan.id}`
-    await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
-      VALUES (${session.householdId}, ${session.userId}, 'MonthlyPlan', ${plan.id}, 'settings', ${plan.version}, ${version})`
-  }
+  if (changed) await Promise.all([
+    tx`UPDATE monthly_plans SET version = ${version}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${plan.id}`,
+    tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
+      VALUES (${session.householdId}, ${session.userId}, 'MonthlyPlan', ${plan.id}, 'settings', ${plan.version}, ${version})`,
+  ])
   if (kept.length) return `В ${inMonth[plan.month - 1]} оставили то, что меняли в месяце: ${kept.join(', ')}.`
   return changed ? `${monthNames[plan.month - 1]} тоже обновлён.` : ''
 }
