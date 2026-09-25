@@ -28,7 +28,7 @@ const payment = z.object({
   due: z.string().max(80), enabled: z.boolean(), category: z.string().max(100), recurringPaymentId: uuid.nullable().optional(),
   schedule: z.enum(['monthly', 'weekly']).nullable().optional(), weekdays: weekdays.nullable().optional(),
   unitPrice: moneySchema.nullable().optional(), quantity: z.number().int().min(0).max(1000).nullable().optional(),
-  exclusionReason: z.string().max(200).optional(), amountPending: z.boolean().optional(),
+  exclusionReason: z.string().max(200).optional(), amountPending: z.boolean().optional(), checked: z.boolean().optional(),
 }).refine((value) => (value.unitPrice == null) === (value.quantity == null), { message: 'Unit price and quantity go together' })
   .refine((value) => value.unitPrice == null || value.amount === value.unitPrice * value.quantity!, { message: 'Amount must equal unit price × quantity' })
 const allocation = z.object({

@@ -31,7 +31,8 @@ const pending = (varies: boolean, open: boolean, followsSettings: boolean, wasPe
   varies && open && followsSettings && (Boolean(wasPending) || !variedBefore)
 
 // Carries a settings change into the open month. A field follows settings only while the month still has the old
-// settings value; a value changed in the month itself wins and is reported in `kept`. Exclusions and income status stay.
+// settings value; a value changed in the month itself wins and is reported in `kept`. Exclusions and income status stay,
+// and so does a checked payment amount.
 // `beforePeriod` is the period the old values were computed for, when the period itself changed.
 export function mergePayment(period: Period, row: MoneyPayment | null, before: PaymentTemplate | null, after: PaymentTemplate, newId: () => string = () => crypto.randomUUID(), beforePeriod: Period = period): Merge<MoneyPayment> {
   if (!row) return { value: paymentFromTemplate(period, after, newId()), kept: [] }
@@ -48,11 +49,17 @@ export function mergePayment(period: Period, row: MoneyPayment | null, before: P
     // New weekdays mean a new count; otherwise a count corrected in the month stays.
     const quantity = row.schedule === 'weekly' && sameDays(row.weekdays, next.weekdays) ? pick('quantity', 'количество') : next.quantity
     const unitPrice = row.schedule === 'weekly' ? pick('unitPrice', 'цена за раз') : next.unitPrice
+    if (row.checked && row.schedule === 'weekly' && row.amount !== unitPrice! * quantity!) {
+      kept.push('сумма')
+      return { value: { ...base, amountPending: false }, kept }
+    }
     return { value: { ...base, schedule: 'weekly', weekdays: next.weekdays, unitPrice, quantity, amount: unitPrice! * quantity!, due: whenever, amountPending: false }, kept }
   }
-  const amount = row.schedule === 'weekly' ? next.amount : pick('amount', 'сумма')
+  // A checked amount stays as it is, whatever settings say now.
+  const amount = row.checked ? row.amount : row.schedule === 'weekly' ? next.amount : pick('amount', 'сумма')
+  if (row.checked && amount !== next.amount && !kept.includes('сумма')) kept.push('сумма')
   const due = row.schedule === 'weekly' ? next.due : pick('due', 'дата')
-  const amountPending = pending(Boolean(after.varies), true, !old || row.amount === old.amount, row.amountPending, before?.varies)
+  const amountPending = !row.checked && pending(Boolean(after.varies), true, !old || row.amount === old.amount, row.amountPending, before?.varies)
   return { value: { ...base, schedule: 'monthly', weekdays: null, unitPrice: null, quantity: null, amount, due, amountPending }, kept }
 }
 

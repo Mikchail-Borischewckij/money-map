@@ -129,7 +129,7 @@ it('adds business accounts and period start days, and drops the open month livin
     const living = "INSERT INTO allocations (monthly_plan_id, name, type, amount, account_id) VALUES ($1, 'На жизнь', 'living', 100, $2)"
     await pg.query(living, [closed, account])
     await pg.query(living, [open, account])
-    for (const file of ['006_business_accounts.sql', '007_period_start_day.sql']) {
+    for (const file of ['006_business_accounts.sql', '007_period_start_day.sql', '008_payment_checked.sql']) {
       await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
     }
     expect((await pg.query('SELECT monthly_plan_id FROM allocations')).rows).toEqual([{ monthly_plan_id: closed }])
@@ -138,6 +138,8 @@ it('adds business accounts and period start days, and drops the open month livin
     await expect(pg.query('UPDATE households SET period_start_day = 29')).rejects.toThrow()
     await expect(pg.query('UPDATE accounts SET sweep_to_account_id = id')).rejects.toThrow()
     await expect(pg.query('UPDATE accounts SET keep_amount = -1')).rejects.toThrow()
+    await pg.query("INSERT INTO monthly_payments (monthly_plan_id, name_snapshot, category_snapshot, amount, account_id) VALUES ($1, 'Аренда', 'Жильё', 100, $2)", [open, account])
+    expect((await pg.query('SELECT is_checked FROM monthly_payments')).rows).toEqual([{ is_checked: false }])
   } finally {
     await pg.close()
   }

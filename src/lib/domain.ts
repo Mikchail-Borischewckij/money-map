@@ -48,6 +48,8 @@ export type Payment = {
   exclusionReason?: string
   // Set while the amount is still the estimate from settings for a payment whose amount changes monthly.
   amountPending?: boolean
+  // The amount is checked for this month: locked in the month and kept when settings change.
+  checked?: boolean
 }
 
 export type Allocation = {

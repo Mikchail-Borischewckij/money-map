@@ -248,6 +248,9 @@
 .data-table td .text-input { height: 34px; font-size: 13px; margin-top: 6px; max-width: 320px; }
 .payments-table .units-cell { justify-content: flex-end; }
 .section > .segmented { margin-top: 4px; }
+.data-table .col-check { width: 1%; text-align: center; }
+.data-table thead .col-check { font-size: 11px; }
+.checked-mark { color: var(--primary); vertical-align: middle; }
 .cell-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
 .cell-flow { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; }
 .cell-flow svg { color: var(--muted); }

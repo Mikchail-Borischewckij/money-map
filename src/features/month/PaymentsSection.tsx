@@ -28,7 +28,7 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
   const row = (payment: Payment) => <PaymentRow key={payment.id} payment={payment} period={periodOfPlan(plan)} readOnly={readOnly} accountTag={accountTag}
     onChange={(patch) => change(payment.id, patch)} onRemove={() => remove(payment.id)} onReset={() => onReset(payment.id)} />
   const group = (title: string, items: Payment[]) => items.length > 0 && <tbody>
-    <tr className="group-row"><th colSpan={3}>{title}</th><th className="num">{money(total(items))}</th><th /></tr>
+    <tr className="group-row"><th colSpan={3}>{title}</th><th className="num">{money(total(items))}</th><th colSpan={2} /></tr>
     {items.map(row)}
   </tbody>
   return <Section step={3} title="Платежи" meta={<span>Всего {money(total(plan.payments.filter((payment) => payment.enabled)))}</span>}
@@ -37,11 +37,11 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
     {used.length > 1 && <Segmented size="sm" label="Счёт" value={accountId} onChange={setFilter}
       options={[{ value: ALL, label: 'Все счета' }, ...used.map((account) => ({ value: account.id, label: account.name }))]} />}
     {plan.payments.length > 0 && <div className="table-scroll"><table className="data-table payments-table">
-      <thead><tr><th>Платёж</th><th className="col-opt">Счёт</th><th className="col-opt">Когда</th><th className="num">Сумма</th><th className="actions"><span className="sr-only">Действия</span></th></tr></thead>
+      <thead><tr><th>Платёж</th><th className="col-opt">Счёт</th><th className="col-opt">Когда</th><th className="num">Сумма</th><th className="col-check">Проверено</th><th className="actions"><span className="sr-only">Действия</span></th></tr></thead>
       {group('Регулярные', regular)}
       {group('Разовые', once)}
-      {regular.length + once.length === 0 && <tbody><tr><td colSpan={5} className="muted">Платежей с этого счёта нет.</td></tr></tbody>}
-      <tfoot><tr><th colSpan={3}>{accountId === ALL ? 'Итого' : 'Итого по счёту'}</th><th className="num">{money(total([...regular, ...once]))}</th><th /></tr></tfoot>
+      {regular.length + once.length === 0 && <tbody><tr><td colSpan={6} className="muted">Платежей с этого счёта нет.</td></tr></tbody>}
+      <tfoot><tr><th colSpan={3}>{accountId === ALL ? 'Итого' : 'Итого по счёту'}</th><th className="num">{money(total([...regular, ...once]))}</th><th colSpan={2} /></tr></tfoot>
     </table></div>}
     {excluded.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowExcluded(!showExcluded)}>
       {showExcluded ? 'Скрыть неоплачиваемые' : `Не платим в этом месяце · ${excluded.length} · ${money(total(excluded))}`}

@@ -42,7 +42,7 @@ export async function templateAt(tx: Sql, kind: Kind, id: string, plan: OpenPlan
 }
 
 async function paymentRow(tx: Sql, planId: string, templateId: string) {
-  const rows = await tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending
+  const rows = await tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
     FROM monthly_payments WHERE monthly_plan_id = ${planId} AND recurring_payment_id = ${templateId} LIMIT 1`
   return rows[0] ? toPayment(rows[0]) : null
 }
@@ -96,7 +96,7 @@ export async function shiftOpenMonth(tx: Sql, session: Session, plan: OpenPlan, 
   const from = before.from ? (before.from < periodStart(shifted) ? periodStart(shifted) : before.from > periodEnd(shifted) ? periodEnd(shifted) : before.from) : null
   const after: Period = { ...shifted, from }
   const [payments, incomes] = await Promise.all([
-    tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending
+    tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
       FROM monthly_payments WHERE monthly_plan_id = ${plan.id}`,
     tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${plan.id}`,
   ])

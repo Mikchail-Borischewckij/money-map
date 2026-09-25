@@ -97,4 +97,13 @@ describe('moving the open month to another start day', () => {
     expect(mergePayment(month, { ...row, amountPending: false }, tax, { ...tax, amount: 1 }).value.amountPending).toBe(false)
     expect(mergePayment(month, { ...row, amount: 5 }, tax, { ...tax, amount: 1 }).value).toMatchObject({ amount: 5, amountPending: false })
   })
+
+  it('keeps a checked amount when settings change', () => {
+    const row = { ...paymentFromTemplate(month, rent, 'p1'), checked: true }
+    const { value, kept } = mergePayment(month, row, rent, { ...rent, amount: 370000 })
+    expect(value).toMatchObject({ amount: 350000, checked: true })
+    expect(kept).toEqual(['сумма'])
+    const weekly = { ...paymentFromTemplate(month, pool, 'p2'), checked: true }
+    expect(mergePayment(month, weekly, pool, { ...pool, amount: 8000 }).value).toMatchObject({ amount: weekly.amount, unitPrice: 7000 })
+  })
 })

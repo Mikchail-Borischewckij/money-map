@@ -94,14 +94,14 @@ export function insertPayments(tx: Sql, planId: string, version: number, payment
     account_id: payment.accountId, due_date: isoDate(payment.due), is_enabled: payment.enabled,
     schedule_snapshot: payment.recurringPaymentId ? payment.schedule ?? null : null, weekdays_snapshot: intArray(payment.recurringPaymentId ? payment.weekdays : null),
     unit_price: payment.unitPrice ?? null, quantity: payment.quantity ?? null, exclusion_reason: payment.enabled ? '' : payment.exclusionReason ?? '',
-    amount_pending: Boolean(payment.recurringPaymentId && payment.amountPending),
+    amount_pending: Boolean(payment.recurringPaymentId && payment.amountPending), is_checked: payment.enabled && Boolean(payment.checked),
   }))
   return tx`INSERT INTO monthly_payments (id, monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, is_enabled, version,
-      schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending)
+      schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked)
     SELECT x.id, ${planId}, x.recurring_payment_id, x.name_snapshot, x.category_snapshot, x.amount, x.account_id, x.due_date, x.is_enabled, ${version},
-      x.schedule_snapshot, x.weekdays_snapshot::integer[], x.unit_price, x.quantity, x.exclusion_reason, x.amount_pending
+      x.schedule_snapshot, x.weekdays_snapshot::integer[], x.unit_price, x.quantity, x.exclusion_reason, x.amount_pending, x.is_checked
     FROM jsonb_to_recordset(${json(rows)}::text::jsonb) AS x(id uuid, recurring_payment_id uuid, name_snapshot text, category_snapshot text, amount bigint, account_id uuid,
-      due_date date, is_enabled boolean, schedule_snapshot text, weekdays_snapshot text, unit_price bigint, quantity integer, exclusion_reason text, amount_pending boolean)`
+      due_date date, is_enabled boolean, schedule_snapshot text, weekdays_snapshot text, unit_price bigint, quantity integer, exclusion_reason text, amount_pending boolean, is_checked boolean)`
 }
 
 // A month started after its first day has its balances entered today, so what already happened is not counted again.
@@ -190,7 +190,7 @@ export async function readPlan(session: Session, id: string) {
     db()`SELECT account_id, amount, is_confirmed, balance_date::text FROM account_balances WHERE monthly_plan_id = ${id}`,
     db()`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${id} ORDER BY id`,
     db()`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled,
-      schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending
+      schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
       FROM monthly_payments WHERE monthly_plan_id = ${id} ORDER BY id`,
     db()`SELECT id, name, type, amount, account_id FROM allocations WHERE monthly_plan_id = ${id} ORDER BY id`,
   ])
@@ -208,7 +208,7 @@ export async function readPlan(session: Session, id: string) {
       }
     }),
     incomes: incomes.map((income) => ({ id: income.id, recurringIncomeId: income.recurring_income_id, name: income.name_snapshot, amount: Number(income.amount), accountId: income.account_id, expectedOn: income.expected_date ?? '', enabled: income.is_enabled, status: income.status === 'Expected' ? 'expected' : income.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: income.amount_pending })),
-    payments: payments.map((payment) => ({ id: payment.id, recurringPaymentId: payment.recurring_payment_id, name: payment.name_snapshot, amount: Number(payment.amount), accountId: payment.account_id, due: payment.due_date ?? whenever, enabled: payment.is_enabled, category: payment.category_snapshot, schedule: payment.schedule_snapshot, weekdays: payment.weekdays_snapshot, unitPrice: payment.unit_price === null ? null : Number(payment.unit_price), quantity: payment.quantity, exclusionReason: payment.exclusion_reason, amountPending: payment.amount_pending })),
+    payments: payments.map((payment) => ({ id: payment.id, recurringPaymentId: payment.recurring_payment_id, name: payment.name_snapshot, amount: Number(payment.amount), accountId: payment.account_id, due: payment.due_date ?? whenever, enabled: payment.is_enabled, category: payment.category_snapshot, schedule: payment.schedule_snapshot, weekdays: payment.weekdays_snapshot, unitPrice: payment.unit_price === null ? null : Number(payment.unit_price), quantity: payment.quantity, exclusionReason: payment.exclusion_reason, amountPending: payment.amount_pending, checked: payment.is_checked })),
     allocations: allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, amount: Number(allocation.amount), accountId: allocation.account_id, kind: allocation.type })),
   }
   return { id: record.id as string, version: record.version as number, status: record.status as 'Draft' | 'Finalized', updatedAt: record.updated_at, updatedBy: record.updated_by_name, balanceDate: record.balance_date, plan, summary: calculateMoneyPlan(plan) }
@@ -328,7 +328,7 @@ async function resetItem(session: Session, kind: 'payment' | 'income', planId: s
         amount = ${value.amount}, account_id = ${value.accountId}, due_date = ${isoDate(value.due)},
         schedule_snapshot = ${value.schedule ?? null}, weekdays_snapshot = ${intArray(value.weekdays)}::integer[],
         unit_price = ${value.unitPrice ?? null}, quantity = ${value.quantity ?? null}, exclusion_reason = '',
-        is_enabled = true, amount_pending = ${Boolean(value.amountPending)}, version = ${newVersion} WHERE id = ${itemId}`
+        is_enabled = true, amount_pending = ${Boolean(value.amountPending)}, is_checked = false, version = ${newVersion} WHERE id = ${itemId}`
     } else {
       const value = incomeFromTemplate(period, template as IncomeTemplate, itemId)
       await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, amount = ${value.amount},
