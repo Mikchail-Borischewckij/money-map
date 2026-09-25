@@ -1,4 +1,7 @@
-export type AccountKind = 'current' | 'savings' | 'cash'
+import { toApiPlan, toUiSummary } from './api-client'
+import { calculateMoneyPlan } from '../server/money'
+
+export type AccountKind = 'current' | 'savings' | 'cash' | 'business'
 
 export type Account = {
   id: string
@@ -11,6 +14,9 @@ export type Account = {
   priority: number
   version?: number
   isArchived?: boolean
+  // Business accounts: where everything above payments and the reserve goes, and the reserve itself.
+  sweepToAccountId?: string | null
+  keepAmount?: number
 }
 
 export type Income = {
@@ -40,6 +46,8 @@ export type Payment = {
   unitPrice?: number | null
   quantity?: number | null
   exclusionReason?: string
+  // Set while the amount is still the estimate from settings for a payment whose amount changes monthly.
+  amountPending?: boolean
 }
 
 export type Allocation = {
@@ -52,6 +60,8 @@ export type Allocation = {
 
 export type Plan = {
   month: string
+  // The day of the month the period starts on; 1 means the calendar month.
+  startDay?: number
   accounts: Account[]
   incomes: Income[]
   payments: Payment[]
@@ -62,10 +72,14 @@ export type AccountSummary = Account & {
   expectedIncome: number
   payments: number
   allocations: number
+  keep: number
   available: number
   needed: number
   gap: number
   surplus: number
+  incoming: number
+  outgoing: number
+  remaining: number
 }
 
 export type Transfer = {
@@ -73,6 +87,7 @@ export type Transfer = {
   fromAccountId: string
   toAccountId: string
   amount: number
+  kind: 'sweep' | 'cover'
 }
 
 export type PlanSummary = {
@@ -85,94 +100,15 @@ export type PlanSummary = {
   totalLiving: number
   totalSavings: number
   totalOther: number
+  totalKeep: number
   freeAfterPlan: number
   uncovered: number
 }
 
-// A regular income with a changing amount still carries the settings estimate until someone checks it.
-export const amountToCheck = (income: Income) => Boolean(income.amountPending) && income.enabled && income.status === 'expected'
+// A regular income or payment with a changing amount still carries the settings estimate until someone checks it.
+export const amountToCheck = (item: Income | Payment) => Boolean(item.amountPending) && item.enabled && (!('status' in item) || item.status === 'expected')
 
-const sum = (values: number[]) => values.reduce((total, value) => total + value, 0)
+export const isBusiness = (account: Pick<Account, 'kind'>) => account.kind === 'business'
 
-export function calculatePlan(plan: Plan): PlanSummary {
-  const summaries: AccountSummary[] = plan.accounts.map((account) => {
-    const expectedIncome = sum(
-      plan.incomes
-        .filter((income) => income.enabled && income.status === 'expected' && income.accountId === account.id)
-        .map((income) => income.amount),
-    )
-    const payments = sum(
-      plan.payments
-        .filter((payment) => payment.enabled && payment.accountId === account.id)
-        .map((payment) => payment.amount),
-    )
-    const allocations = sum(
-      plan.allocations
-        .filter((allocation) => allocation.accountId === account.id)
-        .map((allocation) => allocation.amount),
-    )
-    const available = account.openingBalance + expectedIncome
-    const needed = payments + allocations
-
-    return {
-      ...account,
-      expectedIncome,
-      payments,
-      allocations,
-      available,
-      needed,
-      gap: Math.max(0, needed - available),
-      surplus: Math.max(0, available - needed),
-    }
-  })
-
-  const sources = summaries
-    .filter((account) => account.canFundTransfers && account.surplus > 0)
-    .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
-    .map((account) => ({ id: account.id, remaining: account.surplus }))
-
-  const targets = summaries
-    .filter((account) => account.gap > 0)
-    .sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id))
-    .map((account) => ({ id: account.id, remaining: account.gap }))
-
-  const transfers: Transfer[] = []
-  for (const target of targets) {
-    for (const source of sources) {
-      if (target.remaining <= 0) break
-      if (source.id === target.id || source.remaining <= 0) continue
-      const amount = Math.min(source.remaining, target.remaining)
-      transfers.push({
-        id: `${source.id}-${target.id}`,
-        fromAccountId: source.id,
-        toAccountId: target.id,
-        amount,
-      })
-      source.remaining -= amount
-      target.remaining -= amount
-    }
-  }
-
-  const totalIncome = sum(
-    plan.incomes.filter((income) => income.enabled && income.status === 'expected').map((income) => income.amount),
-  )
-  const totalPayments = sum(plan.payments.filter((payment) => payment.enabled).map((payment) => payment.amount))
-  const totalLiving = sum(plan.allocations.filter((allocation) => allocation.kind === 'living').map((allocation) => allocation.amount))
-  const totalSavings = sum(plan.allocations.filter((allocation) => allocation.kind === 'savings').map((allocation) => allocation.amount))
-  const totalOther = sum(plan.allocations.filter((allocation) => allocation.kind === 'other').map((allocation) => allocation.amount))
-  const totalAvailable = sum(summaries.map((account) => account.available))
-
-  return {
-    accounts: summaries,
-    transfers,
-    isPreliminary: plan.accounts.length === 0 || plan.accounts.some((account) => !account.balanceConfirmed) || plan.incomes.some(amountToCheck),
-    totalAvailable,
-    totalIncome,
-    totalPayments,
-    totalLiving,
-    totalSavings,
-    totalOther,
-    freeAfterPlan: totalAvailable - totalPayments - totalLiving - totalSavings - totalOther,
-    uncovered: sum(targets.map((target) => target.remaining)),
-  }
-}
+// The same calculation as on the server, in grosz, so the screen and the saved month always agree.
+export const calculatePlan = (plan: Plan): PlanSummary => toUiSummary(calculateMoneyPlan(toApiPlan(plan)))

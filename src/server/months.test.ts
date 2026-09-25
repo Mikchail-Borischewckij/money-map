@@ -16,3 +16,11 @@ describe('which month starts next', () => {
     expect(calendarMonth(new Date('2026-09-30T22:30:00Z'))).toEqual({ year: 2026, month: 10 })
   })
 })
+
+describe('the current period', () => {
+  it('belongs to the previous month before the start day', () => {
+    expect(calendarMonth(new Date('2026-10-10T10:00:00Z'), 15)).toEqual({ year: 2026, month: 9 })
+    expect(calendarMonth(new Date('2026-10-15T10:00:00Z'), 15)).toEqual({ year: 2026, month: 10 })
+    expect(calendarMonth(new Date('2027-01-05T10:00:00Z'), 15)).toEqual({ year: 2026, month: 12 })
+  })
+})

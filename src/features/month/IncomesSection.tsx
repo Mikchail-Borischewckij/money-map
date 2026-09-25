@@ -8,7 +8,7 @@ import { cx, money } from '@/lib/format'
 import Amount from './Amount'
 import OneOffDialog from './OneOffDialog'
 import Section from './Section'
-import { dayInMonth, dayText, incomeStatuses, total, type UpdatePlan } from './utils'
+import { dayInPlan, dayText, incomeStatuses, total, type UpdatePlan } from './utils'
 
 export default function IncomesSection({ plan, readOnly, update, accountName, accounts, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountName: (id: string) => string; accounts: Account[]; onReset: (id: string) => void }) {
   const [adding, setAdding] = useState(false)
@@ -43,9 +43,9 @@ export default function IncomesSection({ plan, readOnly, update, accountName, ac
     </div>
     {toCheck > 0 && <p className="note">Сумма меняется от месяца к месяцу — сейчас стоит оценка из настроек. Впишите точную или нажмите «Сумма верна».</p>}
     {plan.incomes.some((income) => income.status === 'included' && income.enabled) && <p className="note">«Уже на счёте» — деньги уже входят в остаток и второй раз не считаются.</p>}
-    {adding && <OneOffDialog kind="income" month={plan.month} accounts={accounts} categories={[]} onClose={() => setAdding(false)}
+    {adding && <OneOffDialog kind="income" plan={plan} accounts={accounts} categories={[]} onClose={() => setAdding(false)}
       onSave={({ name, amount, accountId, day }) => {
-        update((current) => ({ ...current, incomes: [...current.incomes, { id: crypto.randomUUID(), name, amount, accountId, expectedOn: day ? dayInMonth(current.month, day) : '', enabled: true, status: 'expected' }] }))
+        update((current) => ({ ...current, incomes: [...current.incomes, { id: crypto.randomUUID(), name, amount, accountId, expectedOn: day ? dayInPlan(current, day) : '', enabled: true, status: 'expected' }] }))
         setAdding(false)
       }} />}
   </Section>

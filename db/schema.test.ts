@@ -113,3 +113,32 @@ it('adds the changing-amount mark to existing incomes as off', async () => {
     await pg.close()
   }
 })
+
+it('adds business accounts and period start days, and drops the open month living amount', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    for (const file of ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql', '004_single_open_month.sql', '005_income_amount_varies.sql']) {
+      await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    }
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    const user = (await pg.query<{ id: string }>("INSERT INTO users (household_id, google_subject, initial_email, email, display_name) VALUES ($1, 's', 't@example.invalid', 't@example.invalid', 'T') RETURNING id", [household])).rows[0].id
+    const account = (await pg.query<{ id: string }>("INSERT INTO accounts (household_id, name) VALUES ($1, 'Личный') RETURNING id", [household])).rows[0].id
+    const plan = 'INSERT INTO monthly_plans (household_id, year, month, status, created_by, updated_by) VALUES ($1, 2026, $2, $3, $4, $4) RETURNING id'
+    const closed = (await pg.query<{ id: string }>(plan, [household, 8, 'Finalized', user])).rows[0].id
+    const open = (await pg.query<{ id: string }>(plan, [household, 9, 'Draft', user])).rows[0].id
+    const living = "INSERT INTO allocations (monthly_plan_id, name, type, amount, account_id) VALUES ($1, 'На жизнь', 'living', 100, $2)"
+    await pg.query(living, [closed, account])
+    await pg.query(living, [open, account])
+    for (const file of ['006_business_accounts.sql', '007_period_start_day.sql']) {
+      await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    }
+    expect((await pg.query('SELECT monthly_plan_id FROM allocations')).rows).toEqual([{ monthly_plan_id: closed }])
+    expect((await pg.query('SELECT period_start_day FROM households')).rows).toEqual([{ period_start_day: 1 }])
+    expect((await pg.query('SELECT start_day FROM monthly_plans WHERE id = $1', [open])).rows).toEqual([{ start_day: 1 }])
+    await expect(pg.query('UPDATE households SET period_start_day = 29')).rejects.toThrow()
+    await expect(pg.query('UPDATE accounts SET sweep_to_account_id = id')).rejects.toThrow()
+    await expect(pg.query('UPDATE accounts SET keep_amount = -1')).rejects.toThrow()
+  } finally {
+    await pg.close()
+  }
+})

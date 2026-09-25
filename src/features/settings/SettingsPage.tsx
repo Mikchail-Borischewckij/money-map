@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Segmented, type Option } from '@/components/ui'
 import AccountsTab from './AccountsTab'
 import CategoriesTab from './CategoriesTab'
+import PeriodTab from './PeriodTab'
 import TemplatesTab from './TemplatesTab'
 import type { Lists, Preview } from './types'
 
-type Tab = 'accounts' | 'payments' | 'incomes' | 'categories'
-const tabs: Option<Tab>[] = [{ value: 'accounts', label: 'Счета' }, { value: 'payments', label: 'Платежи' }, { value: 'incomes', label: 'Доходы' }, { value: 'categories', label: 'Категории' }]
-const empty: Lists = { accounts: [], payments: [], incomes: [], categories: [] }
+type Tab = 'accounts' | 'payments' | 'incomes' | 'categories' | 'period'
+const tabs: Option<Tab>[] = [{ value: 'accounts', label: 'Счета' }, { value: 'payments', label: 'Платежи' }, { value: 'incomes', label: 'Доходы' }, { value: 'categories', label: 'Категории' }, { value: 'period', label: 'Период' }]
+const empty: Lists = { accounts: [], payments: [], incomes: [], categories: [], periodStartDay: 1 }
 
 export default function SettingsPage({ csrfToken, onChanged }: { csrfToken: string; onChanged: () => void }) {
   const [tab, setTab] = useState<Tab>('accounts')
@@ -18,10 +19,10 @@ export default function SettingsPage({ csrfToken, onChanged }: { csrfToken: stri
   const [error, setError] = useState('')
 
   const refresh = useCallback(async () => {
-    const responses = await Promise.all(['/api/accounts', '/api/recurring-payments', '/api/recurring-incomes', '/api/categories'].map((url) => fetch(url, { cache: 'no-store' })))
+    const responses = await Promise.all(['/api/accounts', '/api/recurring-payments', '/api/recurring-incomes', '/api/categories', '/api/settings'].map((url) => fetch(url, { cache: 'no-store' })))
     if (responses.some((response) => !response.ok)) throw new Error('Не удалось загрузить настройки.')
-    const [accounts, payments, incomes, categories] = await Promise.all(responses.map((response) => response.json()))
-    setLists({ accounts, payments, incomes, categories })
+    const [accounts, payments, incomes, categories, settings] = await Promise.all(responses.map((response) => response.json()))
+    setLists({ accounts, payments, incomes, categories, periodStartDay: settings.periodStartDay })
   }, [])
   useEffect(() => { refresh().catch((failure: Error) => setError(failure.message)) }, [refresh])
 
@@ -46,6 +47,7 @@ export default function SettingsPage({ csrfToken, onChanged }: { csrfToken: stri
     {tab === 'accounts' && <AccountsTab accounts={lists.accounts} csrfToken={csrfToken} run={run} />}
     {tab === 'payments' && <TemplatesTab kind="payment" items={lists.payments} accounts={lists.accounts} categories={lists.categories} csrfToken={csrfToken} run={run} />}
     {tab === 'incomes' && <TemplatesTab kind="income" items={lists.incomes} accounts={lists.accounts} categories={lists.categories} csrfToken={csrfToken} run={run} />}
+    {tab === 'period' && <PeriodTab startDay={lists.periodStartDay} csrfToken={csrfToken} run={run} />}
     {tab === 'categories' && <CategoriesTab categories={lists.categories} csrfToken={csrfToken} run={run} />}
   </div>
 }

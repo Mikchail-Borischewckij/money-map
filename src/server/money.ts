@@ -1,8 +1,10 @@
-export type MoneyAccount = { id: string; name: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean }
+// `sweepToAccountId`: a business account sends everything above its own payments and `keepAmount` to this account in one transfer.
+export type MoneyAccount = { id: string; name: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean; sweepToAccountId?: string | null; keepAmount?: number }
 export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean }
-export type MoneyPayment = { id: string; name: string; amount: number; accountId: string; due: string; enabled: boolean; category: string; recurringPaymentId?: string | null; schedule?: 'monthly' | 'weekly' | null; weekdays?: number[] | null; unitPrice?: number | null; quantity?: number | null; exclusionReason?: string }
+export type MoneyPayment = { id: string; name: string; amount: number; accountId: string; due: string; enabled: boolean; category: string; recurringPaymentId?: string | null; schedule?: 'monthly' | 'weekly' | null; weekdays?: number[] | null; unitPrice?: number | null; quantity?: number | null; exclusionReason?: string; amountPending?: boolean }
 export type MoneyAllocation = { id: string; name: string; amount: number; accountId: string; kind: 'living' | 'savings' | 'other' }
-export type MoneyPlan = { month: string; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[] }
+// `startDay`: the day of the month the period starts on (1 = calendar month). Set by the server.
+export type MoneyPlan = { month: string; startDay?: number; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[] }
 
 const cents = (value: number) => {
   if (!Number.isSafeInteger(value) || value < 0 || value > 9_000_000_000_000) throw new Error('Invalid money amount')
@@ -13,46 +15,86 @@ const safeNumber = (value: bigint) => {
   return Number(value)
 }
 
-// A regular income with a changing amount still carries the settings estimate until someone checks it.
-export const amountToCheck = (income: MoneyIncome) => Boolean(income.amountPending) && income.enabled && income.status === 'expected'
+// A regular income or payment with a changing amount still carries the settings estimate until someone checks it.
+export const amountToCheck = (item: MoneyIncome | MoneyPayment) => Boolean(item.amountPending) && item.enabled && (!('status' in item) || item.status === 'expected')
 
+export const isBusiness = (account: MoneyAccount) => account.kind === 'business'
+
+// Transfers, in the order to make them:
+// 1. Each business account sends everything above its payments and reserve to its personal account, in one transfer.
+// 2. Accounts that cannot cover their payments are topped up from the accounts allowed to fund transfers, in list order.
+//    Business accounts are never used for this: their money reaches other accounts through the personal account.
 export function calculateMoneyPlan(plan: MoneyPlan) {
-  const accounts = plan.accounts.map((account) => {
+  const ids = new Set(plan.accounts.map((account) => account.id))
+  const base = plan.accounts.map((account) => {
     const opening = cents(account.openingBalance)
     const expectedIncome = plan.incomes.filter((income) => income.enabled && income.status === 'expected' && income.accountId === account.id).reduce((sum, income) => sum + cents(income.amount), 0n)
     const payments = plan.payments.filter((payment) => payment.enabled && payment.accountId === account.id).reduce((sum, payment) => sum + cents(payment.amount), 0n)
     const allocations = plan.allocations.filter((allocation) => allocation.accountId === account.id).reduce((sum, allocation) => sum + cents(allocation.amount), 0n)
-    const available = opening + expectedIncome
-    const needed = payments + allocations
-    return { ...account, expectedIncome: safeNumber(expectedIncome), payments: safeNumber(payments), allocations: safeNumber(allocations), available: safeNumber(available), needed: safeNumber(needed), gap: safeNumber(needed > available ? needed - available : 0n), surplus: safeNumber(available > needed ? available - needed : 0n) }
+    const keep = isBusiness(account) ? cents(account.keepAmount ?? 0) : 0n
+    return { account, available: opening + expectedIncome, expectedIncome, payments, allocations, keep, incoming: 0n, outgoing: 0n }
   })
-  const sources = accounts.filter((account) => account.canFundTransfers && account.surplus > 0).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)).map((account) => ({ id: account.id, remaining: BigInt(account.surplus) }))
-  const targets = accounts.filter((account) => account.gap > 0).sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id)).map((account) => ({ id: account.id, remaining: BigInt(account.gap) }))
-  const transfers: { id: string; fromAccountId: string; toAccountId: string; amount: number }[] = []
+  const byId = new Map(base.map((item) => [item.account.id, item]))
+  const transfers: { id: string; fromAccountId: string; toAccountId: string; amount: number; kind: 'sweep' | 'cover' }[] = []
+  const move = (from: typeof base[number], to: typeof base[number], amount: bigint, kind: 'sweep' | 'cover') => {
+    if (amount <= 0n) return
+    from.outgoing += amount
+    to.incoming += amount
+    transfers.push({ id: `${from.account.id}-${to.account.id}`, fromAccountId: from.account.id, toAccountId: to.account.id, amount: safeNumber(amount), kind })
+  }
+  const balance = (item: typeof base[number]) => item.available + item.incoming - item.outgoing - item.payments - item.allocations - item.keep
+
+  for (const item of base) {
+    const target = item.account.sweepToAccountId
+    if (!isBusiness(item.account) || !target || target === item.account.id || !ids.has(target)) continue
+    move(item, byId.get(target)!, balance(item), 'sweep')
+  }
+
+  const ordered = [...base].sort((a, b) => a.account.priority - b.account.priority || a.account.id.localeCompare(b.account.id))
+  const targets = ordered.filter((item) => balance(item) < 0n).map((item) => ({ item, remaining: -balance(item) }))
+  const sources = ordered.filter((item) => item.account.canFundTransfers && !isBusiness(item.account) && balance(item) > 0n)
   for (const target of targets) {
     for (const source of sources) {
       if (target.remaining === 0n) break
-      if (source.remaining === 0n || source.id === target.id) continue
-      const amount = source.remaining < target.remaining ? source.remaining : target.remaining
-      transfers.push({ id: `${source.id}-${target.id}`, fromAccountId: source.id, toAccountId: target.id, amount: safeNumber(amount) })
-      source.remaining -= amount
+      if (source === target.item) continue
+      const spare = balance(source)
+      if (spare <= 0n) continue
+      const amount = spare < target.remaining ? spare : target.remaining
+      move(source, target.item, amount, 'cover')
       target.remaining -= amount
     }
   }
-  const total = (values: number[]) => values.reduce((sum, value) => sum + BigInt(value), 0n)
-  const totalIncome = total(plan.incomes.filter((income) => income.enabled && income.status === 'expected').map((income) => cents(income.amount)).map(safeNumber))
-  const totalPayments = total(plan.payments.filter((payment) => payment.enabled).map((payment) => cents(payment.amount)).map(safeNumber))
-  const totalLiving = total(plan.allocations.filter((allocation) => allocation.kind === 'living').map((allocation) => cents(allocation.amount)).map(safeNumber))
-  const totalSavings = total(plan.allocations.filter((allocation) => allocation.kind === 'savings').map((allocation) => cents(allocation.amount)).map(safeNumber))
-  const totalOther = total(plan.allocations.filter((allocation) => allocation.kind === 'other').map((allocation) => cents(allocation.amount)).map(safeNumber))
-  const totalAvailable = total(accounts.map((account) => account.available))
+
+  const accounts = base.map((item) => {
+    const needed = item.payments + item.allocations + item.keep
+    return {
+      ...item.account,
+      expectedIncome: safeNumber(item.expectedIncome), payments: safeNumber(item.payments), allocations: safeNumber(item.allocations), keep: safeNumber(item.keep),
+      available: safeNumber(item.available), needed: safeNumber(needed),
+      gap: safeNumber(needed > item.available ? needed - item.available : 0n), surplus: safeNumber(item.available > needed ? item.available - needed : 0n),
+      incoming: safeNumber(item.incoming), outgoing: safeNumber(item.outgoing),
+      // What stays on the account after this period's payments, savings and transfers (a business reserve included).
+      remaining: safeNumber(item.available + item.incoming - item.outgoing - item.payments - item.allocations),
+    }
+  })
+  const sumOf = (values: bigint[]) => values.reduce((sum, value) => sum + value, 0n)
+  const allocationsOf = (kind: MoneyAllocation['kind']) => sumOf(plan.allocations.filter((allocation) => allocation.kind === kind).map((allocation) => cents(allocation.amount)))
+  const totalIncome = sumOf(plan.incomes.filter((income) => income.enabled && income.status === 'expected').map((income) => cents(income.amount)))
+  const totalPayments = sumOf(plan.payments.filter((payment) => payment.enabled).map((payment) => cents(payment.amount)))
+  // "living" allocations exist only in months planned before living money became the remainder.
+  const totalLiving = allocationsOf('living')
+  const totalSavings = allocationsOf('savings')
+  const totalOther = allocationsOf('other')
+  const totalKeep = sumOf(base.map((item) => item.keep))
+  const totalAvailable = sumOf(base.map((item) => item.available))
   return {
     accounts, transfers,
-    isPreliminary: accounts.length === 0 || accounts.some((account) => !account.balanceConfirmed) || plan.incomes.some(amountToCheck),
+    isPreliminary: accounts.length === 0 || accounts.some((account) => !account.balanceConfirmed) || plan.incomes.some(amountToCheck) || plan.payments.some(amountToCheck),
     totalAvailable: safeNumber(totalAvailable), totalIncome: safeNumber(totalIncome),
     totalPayments: safeNumber(totalPayments), totalLiving: safeNumber(totalLiving),
-    totalSavings: safeNumber(totalSavings), totalOther: safeNumber(totalOther),
-    freeAfterPlan: safeNumber(totalAvailable - totalPayments - totalLiving - totalSavings - totalOther),
+    totalSavings: safeNumber(totalSavings), totalOther: safeNumber(totalOther), totalKeep: safeNumber(totalKeep),
+    // What is left for living: everything after payments, savings and business reserves.
+    freeAfterPlan: safeNumber(totalAvailable - totalPayments - totalLiving - totalSavings - totalOther - totalKeep),
     uncovered: safeNumber(targets.reduce((sum, target) => sum + target.remaining, 0n)),
   }
 }

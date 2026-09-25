@@ -1,4 +1,5 @@
 import type { Account, Plan } from '@/lib/domain'
+import { dayInPeriod, type Period } from '@/lib/period'
 
 export type UpdatePlan = (change: (plan: Plan) => Plan) => void
 
@@ -13,12 +14,12 @@ export const total = (items: { amount: number }[]) => round(items.reduce((sum, i
 const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 export const dayText = (value: string) => isDate(value) ? `${Number(value.slice(8))}‑е` : ''
 
-export function dayInMonth(month: string, day: number) {
-  const [year, number] = month.split('-').map(Number)
-  return `${month}-${String(Math.min(day, new Date(Date.UTC(year, number, 0)).getUTCDate())).padStart(2, '0')}`
-}
+export const periodOfPlan = (plan: Plan): Period => ({ month: plan.month, startDay: plan.startDay ?? 1 })
 
-export const kindLabel: Record<Account['kind'], string> = { current: 'Текущий', savings: 'Накопительный', cash: 'Наличные' }
+// The date a chosen day of the month falls on in the plan's period.
+export const dayInPlan = (plan: Plan, day: number) => dayInPeriod(periodOfPlan(plan), day)!
+
+export const kindLabel: Record<Account['kind'], string> = { current: 'Текущий', savings: 'Накопительный', cash: 'Наличные', business: 'Бизнес' }
 
 export const incomeStatuses = [
   { value: 'expected', label: 'Ожидается' },

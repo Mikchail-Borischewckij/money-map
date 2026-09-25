@@ -1,8 +1,9 @@
 import { Badge, Button, Checkbox, Empty } from '@/components/ui'
 import type { Account, Plan } from '@/lib/domain'
+import { money } from '@/lib/format'
 import Amount from './Amount'
 import Section from './Section'
-import { kindLabel, type UpdatePlan } from './utils'
+import { kindLabel, total, type UpdatePlan } from './utils'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
@@ -25,5 +26,6 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
         </div>
       </div>)}
     </div>
+    {accounts.length > 0 && <div className="total-row"><span>Итого</span><strong className="amount">{money(total(accounts.map((account) => ({ amount: account.openingBalance }))))}</strong></div>}
   </Section>
 }

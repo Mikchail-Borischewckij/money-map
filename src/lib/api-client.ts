@@ -15,8 +15,8 @@ const zl = (cents: number) => cents / 100
 
 export function toUiPlan(plan: MoneyPlan): Plan {
   return {
-    month: plan.month,
-    accounts: plan.accounts.map((account) => ({ ...account, kind: account.kind as Account['kind'], openingBalance: zl(account.openingBalance) })),
+    month: plan.month, startDay: plan.startDay,
+    accounts: plan.accounts.map((account) => ({ ...account, kind: account.kind as Account['kind'], openingBalance: zl(account.openingBalance), keepAmount: zl(account.keepAmount ?? 0) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: zl(income.amount) })),
     payments: plan.payments.map((payment) => ({ ...payment, amount: zl(payment.amount), unitPrice: payment.unitPrice == null ? null : zl(payment.unitPrice) })),
     allocations: plan.allocations.map((allocation) => ({ ...allocation, amount: zl(allocation.amount) })),
@@ -29,13 +29,14 @@ export function toUiSummary(summary: ServerRecord['summary']): PlanSummary {
     accounts: summary.accounts.map((account) => ({
       ...account, kind: account.kind as Account['kind'],
       openingBalance: zl(account.openingBalance), expectedIncome: zl(account.expectedIncome),
-      payments: zl(account.payments), allocations: zl(account.allocations),
+      payments: zl(account.payments), allocations: zl(account.allocations), keep: zl(account.keep), keepAmount: zl(account.keepAmount ?? 0),
       available: zl(account.available), needed: zl(account.needed), gap: zl(account.gap), surplus: zl(account.surplus),
+      incoming: zl(account.incoming), outgoing: zl(account.outgoing), remaining: zl(account.remaining),
     })),
     transfers: summary.transfers.map((transfer) => ({ ...transfer, amount: zl(transfer.amount) })),
     totalAvailable: zl(summary.totalAvailable), totalIncome: zl(summary.totalIncome),
     totalPayments: zl(summary.totalPayments), totalLiving: zl(summary.totalLiving),
-    totalSavings: zl(summary.totalSavings), totalOther: zl(summary.totalOther),
+    totalSavings: zl(summary.totalSavings), totalOther: zl(summary.totalOther), totalKeep: zl(summary.totalKeep ?? 0),
     freeAfterPlan: zl(summary.freeAfterPlan), uncovered: zl(summary.uncovered),
   }
 }
@@ -51,8 +52,8 @@ export function toCents(value: number) {
 
 export function toApiPlan(plan: Plan): MoneyPlan {
   return {
-    month: plan.month,
-    accounts: plan.accounts.map((account) => ({ ...account, openingBalance: toCents(account.openingBalance) })),
+    month: plan.month, startDay: plan.startDay,
+    accounts: plan.accounts.map((account) => ({ ...account, openingBalance: toCents(account.openingBalance), keepAmount: toCents(account.keepAmount ?? 0) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: toCents(income.amount) })),
     payments: plan.payments.map((payment) => {
       if (payment.unitPrice == null || payment.quantity == null) return { ...payment, amount: toCents(payment.amount), unitPrice: null, quantity: null }

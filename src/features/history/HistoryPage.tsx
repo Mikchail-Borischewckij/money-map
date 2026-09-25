@@ -5,9 +5,9 @@ import { ArrowLeft } from 'lucide-react'
 import { Badge, Empty } from '@/components/ui'
 import MonthView from '@/features/month/MonthView'
 import { toUiPlan, toUiSummary, type ServerRecord } from '@/lib/api-client'
-import { cx, money, monthName } from '@/lib/format'
+import { cx, money, periodTitle } from '@/lib/format'
 
-type HistoryItem = { id: string; year: number; month: number; status: string; totalPayments: number; totalSavings: number; freeAfterPlan: number }
+type HistoryItem = { id: string; year: number; month: number; startDay: number; status: string; totalPayments: number; totalSavings: number; freeAfterPlan: number }
 const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 const noActions = { onResetPayment: () => undefined, onResetIncome: () => undefined, onOpenSettings: () => undefined }
 
@@ -28,7 +28,7 @@ export default function HistoryPage() {
 
   if (viewing) return <div className="page">
     <button type="button" className="link back" onClick={() => setViewing(null)}><ArrowLeft size={16} />История</button>
-    <header className="page-head"><div className="page-title"><h1>{monthName(viewing.plan.month)}</h1><Badge>Закрыт</Badge></div></header>
+    <header className="page-head"><div className="page-title"><h1>{periodTitle(viewing.plan.month, viewing.plan.startDay)}</h1><Badge>Закрыт</Badge></div></header>
     <MonthView plan={toUiPlan(viewing.plan)} summary={toUiSummary(viewing.summary)} readOnly categories={[]} actions={noActions} update={() => undefined} footer={null} />
   </div>
 
@@ -40,8 +40,8 @@ export default function HistoryPage() {
       {items?.length === 0 && <Empty>Закрытых месяцев пока нет.</Empty>}
       <div className="rows">
         {items?.map((item) => <button type="button" className="row row-button" key={item.id} onClick={() => void open(item.id)}>
-          <div className="row-main"><strong>{monthName(monthKey(item.year, item.month))}</strong><span className="row-meta">Платежи {money(item.totalPayments / 100)} · отложено {money(item.totalSavings / 100)}</span></div>
-          <div className="row-side"><span className={cx('amount', item.freeAfterPlan < 0 && 'negative')}>{item.freeAfterPlan < 0 ? 'Не хватало ' : 'Свободно '}{money(Math.abs(item.freeAfterPlan) / 100)}</span></div>
+          <div className="row-main"><strong>{periodTitle(monthKey(item.year, item.month), item.startDay)}</strong><span className="row-meta">Платежи {money(item.totalPayments / 100)} · отложено {money(item.totalSavings / 100)}</span></div>
+          <div className="row-side"><span className={cx('amount', item.freeAfterPlan < 0 && 'negative')}>{item.freeAfterPlan < 0 ? 'Не хватало ' : 'На жизнь '}{money(Math.abs(item.freeAfterPlan) / 100)}</span></div>
         </button>)}
       </div>
     </section>

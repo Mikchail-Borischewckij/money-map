@@ -1,12 +1,13 @@
 import { Badge, Button, RowMenu, Stepper, TextInput, type MenuItem } from '@/components/ui'
-import type { Payment } from '@/lib/domain'
+import { amountToCheck, type Payment } from '@/lib/domain'
 import { money } from '@/lib/format'
-import { countWeekdays, weekdayLabel } from '@/lib/schedule'
+import { countWeekdaysInPeriod, type Period } from '@/lib/period'
+import { weekdayLabel } from '@/lib/schedule'
 import Amount from './Amount'
 import { dayText, round } from './utils'
 
-export default function PaymentRow({ payment, month, readOnly, accountName, onChange, onRemove, onReset }: {
-  payment: Payment; month: string; readOnly: boolean; accountName: (id: string) => string
+export default function PaymentRow({ payment, period, readOnly, accountName, onChange, onRemove, onReset }: {
+  payment: Payment; period: Period; readOnly: boolean; accountName: (id: string) => string
   onChange: (patch: Partial<Payment>) => void; onRemove: () => void; onReset: () => void
 }) {
   const weekly = payment.unitPrice != null && payment.quantity != null
@@ -24,10 +25,11 @@ export default function PaymentRow({ payment, month, readOnly, accountName, onCh
   const menu: MenuItem[] = readOnly ? [] : payment.recurringPaymentId
     ? [{ label: 'Не платить в этом месяце', onSelect: () => onChange({ enabled: false }) }, { label: 'Как в настройках', onSelect: onReset }]
     : [{ label: 'Удалить', danger: true, onSelect: onRemove }]
-  const calendar = weekly && payment.weekdays ? countWeekdays(month, payment.weekdays) : null
+  const calendar = weekly && payment.weekdays ? countWeekdaysInPeriod(period, payment.weekdays) : null
   const setQuantity = (quantity: number) => onChange({ quantity, amount: round(payment.unitPrice! * quantity) })
+  const toCheck = amountToCheck(payment)
   return <div className="row">
-    <div className="row-main"><strong>{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}</strong><span className="row-meta">{meta}</span></div>
+    <div className="row-main"><strong>{payment.name}{!payment.recurringPaymentId && <Badge>разовый</Badge>}{toCheck && <Badge tone="warn">уточните сумму</Badge>}</strong><span className="row-meta">{meta}</span></div>
     <div className="row-side row-side-wrap">
       {weekly ? <>
         <div className="units">
@@ -36,7 +38,8 @@ export default function PaymentRow({ payment, month, readOnly, accountName, onCh
           {!readOnly && calendar !== null && calendar !== payment.quantity && <button type="button" className="link" onClick={() => setQuantity(calendar)}>по календарю {calendar}</button>}
         </div>
         <strong className="amount">{money(payment.amount)}</strong>
-      </> : <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={readOnly} onChange={(amount) => onChange({ amount })} />}
+      </> : <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={readOnly} onChange={(amount) => onChange({ amount, amountPending: false })} />}
+      {!readOnly && toCheck && <Button size="sm" variant="ghost" onClick={() => onChange({ amountPending: false })}>Сумма верна</Button>}
       <RowMenu label={`Действия: ${payment.name}`} items={menu} />
     </div>
   </div>

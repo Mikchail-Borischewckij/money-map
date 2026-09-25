@@ -8,7 +8,7 @@ import { money } from '@/lib/format'
 import OneOffDialog from './OneOffDialog'
 import PaymentRow from './PaymentRow'
 import Section from './Section'
-import { dayInMonth, total, type UpdatePlan } from './utils'
+import { dayInPlan, periodOfPlan, total, type UpdatePlan } from './utils'
 
 export default function PaymentsSection({ plan, readOnly, update, accountName, accounts, categories, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountName: (id: string) => string; accounts: Account[]; categories: string[]; onReset: (id: string) => void }) {
   const [adding, setAdding] = useState(false)
@@ -17,7 +17,7 @@ export default function PaymentsSection({ plan, readOnly, update, accountName, a
   const regular = plan.payments.filter((payment) => payment.enabled && payment.recurringPaymentId)
   const once = plan.payments.filter((payment) => payment.enabled && !payment.recurringPaymentId)
   const excluded = plan.payments.filter((payment) => !payment.enabled)
-  const row = (payment: Payment) => <PaymentRow key={payment.id} payment={payment} month={plan.month} readOnly={readOnly} accountName={accountName}
+  const row = (payment: Payment) => <PaymentRow key={payment.id} payment={payment} period={periodOfPlan(plan)} readOnly={readOnly} accountName={accountName}
     onChange={(patch) => change(payment.id, patch)} onRemove={() => remove(payment.id)} onReset={() => onReset(payment.id)} />
   return <Section step={3} title="Платежи" meta={<span>Всего {money(total([...regular, ...once]))}</span>}
     action={!readOnly && <Button size="sm" variant="ghost" icon={<Plus size={16} />} onClick={() => setAdding(true)}>Разовый платёж</Button>}>
@@ -28,9 +28,9 @@ export default function PaymentsSection({ plan, readOnly, update, accountName, a
       <summary className="group-head"><span>Не платим в этом месяце · {excluded.length}</span><span>{money(total(excluded))}</span></summary>
       <div className="rows">{excluded.map(row)}</div>
     </details>}
-    {adding && <OneOffDialog kind="payment" month={plan.month} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
+    {adding && <OneOffDialog kind="payment" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
       onSave={({ name, amount, accountId, day, category }) => {
-        update((current) => ({ ...current, payments: [...current.payments, { id: crypto.randomUUID(), name, amount, accountId, category, enabled: true, due: day ? dayInMonth(current.month, day) : 'в течение месяца' }] }))
+        update((current) => ({ ...current, payments: [...current.payments, { id: crypto.randomUUID(), name, amount, accountId, category, enabled: true, due: day ? dayInPlan(current, day) : 'в течение месяца' }] }))
         setAdding(false)
       }} />}
   </Section>

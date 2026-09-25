@@ -1,0 +1,16 @@
+import type { Session } from './auth'
+import { db } from './db'
+import type { accountInput } from './validation'
+import type { z } from 'zod'
+
+type AccountValue = z.infer<typeof accountInput>
+
+// Business accounts never fund other accounts directly and send their rest to one open personal account;
+// other accounts carry no business settings. Returns null when the target is not allowed.
+export async function accountFields<T extends AccountValue>(session: Session, value: T, id?: string): Promise<T | null> {
+  if (value.kind !== 'business') return { ...value, sweepToAccountId: null, keepAmount: 0 }
+  if (!value.sweepToAccountId) return { ...value, canFundTransfers: false }
+  if (value.sweepToAccountId === id) return null
+  const target = await db()`SELECT id FROM accounts WHERE id = ${value.sweepToAccountId} AND household_id = ${session.householdId} AND is_archived = false AND type <> 'business'`
+  return target[0] ? { ...value, canFundTransfers: false } : null
+}

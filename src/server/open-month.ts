@@ -1,20 +1,25 @@
-import { intArray, type db } from './db'
+import type { db } from './db'
 import type { Session } from './auth'
-import type { MoneyIncome, MoneyPayment } from './money'
+import { insertIncomes, insertPayments, toIncome, toPayment, updateIncomes, updatePayments } from './month-rows'
 import { mergeIncome, mergePayment, type IncomeTemplate, type PaymentTemplate } from '../lib/month-merge'
+import { dayInPeriod, type Period } from '../lib/period'
 
 type Sql = ReturnType<typeof db>
 type Kind = 'income' | 'payment'
-export type OpenPlan = { id: string; year: number; month: number; version: number }
+export type OpenPlan = { id: string; year: number; month: number; startDay: number; version: number }
 
 const monthText = (plan: OpenPlan) => `${plan.year}-${String(plan.month).padStart(2, '0')}`
+export const periodOfPlan = (plan: OpenPlan): Period => ({ month: monthText(plan), startDay: plan.startDay })
 const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const inMonth = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре']
 
 export async function lockOpenPlan(tx: Sql, householdId: string): Promise<OpenPlan | null> {
-  const rows = await tx`SELECT id, year, month, version FROM monthly_plans WHERE household_id = ${householdId} AND status = 'Draft' FOR UPDATE`
-  return rows[0] ? { id: rows[0].id, year: rows[0].year, month: rows[0].month, version: rows[0].version } : null
+  const rows = await tx`SELECT id, year, month, start_day, version FROM monthly_plans WHERE household_id = ${householdId} AND status = 'Draft' FOR UPDATE`
+  return rows[0] ? { id: rows[0].id, year: rows[0].year, month: rows[0].month, startDay: rows[0].start_day, version: rows[0].version } : null
 }
+
+const incomeTemplate = (row: Record<string, unknown>): IncomeTemplate => ({ id: row.id as string, name: row.name as string, accountId: row.account_id as string, amount: Number(row.default_amount), day: row.expected_day as number | null, varies: Boolean(row.amount_varies) })
+const paymentTemplate = (row: Record<string, unknown>): PaymentTemplate => ({ id: row.id as string, name: row.name as string, category: row.category as string, accountId: row.account_id as string, amount: Number(row.default_amount), day: row.due_day as number | null, schedule: row.schedule as PaymentTemplate['schedule'], weekdays: row.weekdays as number[] | null, varies: Boolean(row.amount_varies) })
 
 // The settings of one item as they apply to the month, or null when the item is not in force for it.
 export async function templateAt(tx: Sql, kind: Kind, id: string, plan: OpenPlan): Promise<PaymentTemplate | IncomeTemplate | null> {
@@ -25,76 +30,89 @@ export async function templateAt(tx: Sql, kind: Kind, id: string, plan: OpenPlan
       WHERE i.id = ${id} AND i.is_archived = false AND a.is_archived = false
       AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
       AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
-    return rows[0] ? { id: rows[0].id, name: rows[0].name, accountId: rows[0].account_id, amount: Number(rows[0].default_amount), day: rows[0].expected_day, varies: rows[0].amount_varies } : null
+    return rows[0] ? incomeTemplate(rows[0]) : null
   }
-  const rows = await tx`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, COALESCE(c.name, '') AS category
+  const rows = await tx`SELECT p.id, v.name, v.default_amount, v.account_id, v.due_day, v.schedule, v.weekdays, p.amount_varies, COALESCE(c.name, '') AS category
     FROM recurring_payments p JOIN payment_template_versions v ON v.recurring_payment_id = p.id JOIN accounts a ON a.id = v.account_id
     LEFT JOIN categories c ON c.id = v.category_id
     WHERE p.id = ${id} AND p.is_archived = false AND a.is_archived = false
     AND p.active_from <= ${first}::date AND (p.active_to IS NULL OR p.active_to >= ${first}::date)
     AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
-  return rows[0] ? { id: rows[0].id, name: rows[0].name, category: rows[0].category, accountId: rows[0].account_id, amount: Number(rows[0].default_amount), day: rows[0].due_day, schedule: rows[0].schedule, weekdays: rows[0].weekdays } : null
+  return rows[0] ? paymentTemplate(rows[0]) : null
 }
 
-async function paymentRow(tx: Sql, planId: string, templateId: string): Promise<MoneyPayment | null> {
-  const rows = await tx`SELECT id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason
+async function paymentRow(tx: Sql, planId: string, templateId: string) {
+  const rows = await tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending
     FROM monthly_payments WHERE monthly_plan_id = ${planId} AND recurring_payment_id = ${templateId} LIMIT 1`
-  const row = rows[0]
-  return row ? { id: row.id, recurringPaymentId: templateId, name: row.name_snapshot, category: row.category_snapshot, amount: Number(row.amount), accountId: row.account_id, due: row.due_date ?? 'в течение месяца', enabled: row.is_enabled, schedule: row.schedule_snapshot, weekdays: row.weekdays_snapshot, unitPrice: row.unit_price === null ? null : Number(row.unit_price), quantity: row.quantity, exclusionReason: row.exclusion_reason } : null
+  return rows[0] ? toPayment(rows[0]) : null
 }
 
-async function incomeRow(tx: Sql, planId: string, templateId: string): Promise<MoneyIncome | null> {
-  const rows = await tx`SELECT id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${planId} AND recurring_income_id = ${templateId} LIMIT 1`
-  const row = rows[0]
-  return row ? { id: row.id, recurringIncomeId: templateId, name: row.name_snapshot, amount: Number(row.amount), accountId: row.account_id, expectedOn: row.expected_date ?? '', enabled: row.is_enabled, status: row.status === 'Expected' ? 'expected' : row.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: row.amount_pending } : null
+async function incomeRow(tx: Sql, planId: string, templateId: string) {
+  const rows = await tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending
+    FROM monthly_incomes WHERE monthly_plan_id = ${planId} AND recurring_income_id = ${templateId} LIMIT 1`
+  return rows[0] ? toIncome(rows[0]) : null
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
+async function bump(tx: Sql, session: Session, plan: OpenPlan, version: number, action: string) {
+  await Promise.all([
+    tx`UPDATE monthly_plans SET version = ${version}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${plan.id}`,
+    tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
+      VALUES (${session.householdId}, ${session.userId}, 'MonthlyPlan', ${plan.id}, ${action}, ${plan.version}, ${version})`,
+  ])
+}
 
 // Carries a settings change into the open month (see mergePayment) and returns a short note for the user.
 // Closed months are never touched: only the single open month is read and written here.
 export async function applyToOpenMonth(tx: Sql, session: Session, kind: Kind, id: string, plan: OpenPlan | null, before: PaymentTemplate | IncomeTemplate | null) {
   if (!plan) return ''
+  const period = periodOfPlan(plan)
   const [after, existing] = await Promise.all([templateAt(tx, kind, id, plan), kind === 'payment' ? paymentRow(tx, plan.id, id) : incomeRow(tx, plan.id, id)])
   if (!after) return ''
   const version = plan.version + 1
-  let changed = false
-  let kept: string[] = []
-  if (kind === 'payment') {
-    const row = existing as MoneyPayment | null
-    const merge = mergePayment(monthText(plan), row, before as PaymentTemplate | null, after as PaymentTemplate)
-    kept = merge.kept
-    const value = merge.value
-    const due = /^\d{4}-\d{2}-\d{2}$/.test(value.due) ? value.due : null
-    if (!row) {
-      await tx`INSERT INTO monthly_payments (id, monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, is_enabled, version, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason)
-        VALUES (${value.id}, ${plan.id}, ${id}, ${value.name}, ${value.category}, ${value.amount}, ${value.accountId}, ${due}, true, ${version}, ${value.schedule ?? null}, ${intArray(value.weekdays)}::integer[], ${value.unitPrice ?? null}, ${value.quantity ?? null}, '')`
-      changed = true
-    } else if (!same(row, value)) {
-      await tx`UPDATE monthly_payments SET name_snapshot = ${value.name}, category_snapshot = ${value.category}, amount = ${value.amount}, account_id = ${value.accountId}, due_date = ${due},
-        schedule_snapshot = ${value.schedule ?? null}, weekdays_snapshot = ${intArray(value.weekdays)}::integer[], unit_price = ${value.unitPrice ?? null}, quantity = ${value.quantity ?? null}, version = ${version}
-        WHERE id = ${row.id}`
-      changed = true
-    }
-  } else {
-    const row = existing as MoneyIncome | null
-    const merge = mergeIncome(monthText(plan), row, before as IncomeTemplate | null, after as IncomeTemplate)
-    kept = merge.kept
-    const value = merge.value
-    if (!row) {
-      await tx`INSERT INTO monthly_incomes (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version, amount_pending)
-        VALUES (${value.id}, ${plan.id}, ${id}, ${value.name}, ${value.amount}, ${value.accountId}, ${value.expectedOn || null}, true, 'Expected', ${version}, ${Boolean(value.amountPending)})`
-      changed = true
-    } else if (!same(row, value)) {
-      await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, amount = ${value.amount}, account_id = ${value.accountId}, expected_date = ${value.expectedOn || null}, amount_pending = ${Boolean(value.amountPending)}, version = ${version} WHERE id = ${row.id}`
-      changed = true
-    }
+  const merge = kind === 'payment'
+    ? mergePayment(period, existing as ReturnType<typeof toPayment> | null, before as PaymentTemplate | null, after as PaymentTemplate)
+    : mergeIncome(period, existing as ReturnType<typeof toIncome> | null, before as IncomeTemplate | null, after as IncomeTemplate)
+  const changed = !existing || !same(existing, merge.value)
+  if (changed) {
+    const write = existing
+      ? (kind === 'payment' ? updatePayments(tx, plan.id, version, [merge.value as ReturnType<typeof toPayment>]) : updateIncomes(tx, plan.id, version, [merge.value as ReturnType<typeof toIncome>]))
+      : (kind === 'payment' ? insertPayments(tx, plan.id, version, [merge.value as ReturnType<typeof toPayment>]) : insertIncomes(tx, plan.id, version, [merge.value as ReturnType<typeof toIncome>]))
+    await write
+    await bump(tx, session, plan, version, 'settings')
   }
-  if (changed) await Promise.all([
-    tx`UPDATE monthly_plans SET version = ${version}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${plan.id}`,
-    tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
-      VALUES (${session.householdId}, ${session.userId}, 'MonthlyPlan', ${plan.id}, 'settings', ${plan.version}, ${version})`,
-  ])
-  if (kept.length) return `В ${inMonth[plan.month - 1]} оставили то, что меняли в месяце: ${kept.join(', ')}.`
+  if (merge.kept.length) return `В ${inMonth[plan.month - 1]} оставили то, что меняли в месяце: ${merge.kept.join(', ')}.`
   return changed ? `${monthNames[plan.month - 1]} тоже обновлён.` : ''
+}
+
+// A new period start day moves the open month to the new dates: regular items get the dates and weekday counts
+// of the new period unless they were changed in the month; one-off items keep their day of the month.
+export async function shiftOpenMonth(tx: Sql, session: Session, plan: OpenPlan, startDay: number) {
+  if (plan.startDay === startDay) return
+  const before = periodOfPlan(plan)
+  const after: Period = { ...before, startDay }
+  const [payments, incomes] = await Promise.all([
+    tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending
+      FROM monthly_payments WHERE monthly_plan_id = ${plan.id}`,
+    tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${plan.id}`,
+  ])
+  const redate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) ? dayInPeriod(after, Number(date.slice(8, 10))) : null
+  const nextPayments = await Promise.all(payments.map(toPayment).map(async (row) => {
+    const template = row.recurringPaymentId ? await templateAt(tx, 'payment', row.recurringPaymentId, plan) as PaymentTemplate | null : null
+    if (template) return mergePayment(after, row, template, template, undefined, before).value
+    return { ...row, due: redate(row.due) ?? row.due }
+  }))
+  const nextIncomes = await Promise.all(incomes.map(toIncome).map(async (row) => {
+    const template = row.recurringIncomeId ? await templateAt(tx, 'income', row.recurringIncomeId, plan) as IncomeTemplate | null : null
+    if (template) return mergeIncome(after, row, template, template, undefined, before).value
+    return { ...row, expectedOn: redate(row.expectedOn) ?? row.expectedOn }
+  }))
+  const version = plan.version + 1
+  await Promise.all([
+    tx`UPDATE monthly_plans SET start_day = ${startDay} WHERE id = ${plan.id}`,
+    updatePayments(tx, plan.id, version, nextPayments),
+    updateIncomes(tx, plan.id, version, nextIncomes),
+    bump(tx, session, plan, version, 'period'),
+  ])
 }

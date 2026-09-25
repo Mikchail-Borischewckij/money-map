@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { MoneyIncome } from '../server/money'
 import { mergeIncome, mergePayment, paymentFromTemplate, type IncomeTemplate, type PaymentTemplate } from './month-merge'
 
-const month = '2026-10'
+const month = { month: '2026-10', startDay: 1 }
 const rent: PaymentTemplate = { id: 'rent', name: 'Аренда', category: 'Жильё', accountId: 'main', amount: 350000, day: 10, schedule: 'monthly', weekdays: null }
 const pool: PaymentTemplate = { id: 'pool', name: 'Бассейн', category: 'Спорт', accountId: 'main', amount: 7000, day: null, schedule: 'weekly', weekdays: [1, 4] }
 const salary: IncomeTemplate = { id: 'salary', name: 'Зарплата', accountId: 'main', amount: 900000, day: 10, varies: false }
@@ -76,5 +76,25 @@ describe('settings changes in the open month', () => {
     expect(mergeIncome(month, { ...salaryRow, amountPending: false }, varying, { ...varying, day: 12 }).value.amountPending).toBe(false)
     expect(mergeIncome(month, { ...salaryRow, amountPending: true }, varying, { ...varying, amount: 800000 }).value).toMatchObject({ amount: 800000, amountPending: true })
     expect(mergeIncome(month, { ...salaryRow, amountPending: true }, varying, salary).value.amountPending).toBe(false)
+  })
+})
+
+describe('moving the open month to another start day', () => {
+  const shifted = { month: '2026-10', startDay: 15 }
+  it('moves dates and weekday counts that still follow settings', () => {
+    expect(mergePayment(shifted, paymentFromTemplate(month, rent, 'p1'), rent, rent, undefined, month).value.due).toBe('2026-11-10')
+    // 15 Oct – 14 Nov 2026: Mondays 19, 26, 2, 9 and Thursdays 15, 22, 29, 5, 12.
+    expect(mergePayment(shifted, paymentFromTemplate(month, pool, 'p2'), pool, pool, undefined, month).value.quantity).toBe(9)
+  })
+  it('keeps a count changed in the month', () => {
+    const row = { ...paymentFromTemplate(month, pool, 'p2'), quantity: 4, amount: 28000 }
+    expect(mergePayment(shifted, row, pool, pool, undefined, month).value.quantity).toBe(4)
+  })
+  it('keeps a changing amount to check until it is checked', () => {
+    const tax = { ...rent, id: 'tax', varies: true }
+    const row = paymentFromTemplate(month, tax, 'p3')
+    expect(row.amountPending).toBe(true)
+    expect(mergePayment(month, { ...row, amountPending: false }, tax, { ...tax, amount: 1 }).value.amountPending).toBe(false)
+    expect(mergePayment(month, { ...row, amount: 5 }, tax, { ...tax, amount: 1 }).value).toMatchObject({ amount: 5, amountPending: false })
   })
 })

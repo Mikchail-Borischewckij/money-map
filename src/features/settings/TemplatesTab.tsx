@@ -27,7 +27,8 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
   const payload = (value: TemplateForm, version?: number, endedFlag = false) => ({
     name: value.name, defaultAmount: toCents(value.amount), accountId: value.accountId,
     day: value.schedule === 'weekly' ? null : value.day, version, ended: endedFlag,
-    ...(kind === 'payment' ? { categoryId: value.categoryId || null, schedule: value.schedule, weekdays: value.schedule === 'weekly' ? value.weekdays : null } : { amountVaries: value.amountVaries }),
+    ...(kind === 'payment' ? { categoryId: value.categoryId || null, schedule: value.schedule, weekdays: value.schedule === 'weekly' ? value.weekdays : null } : {}),
+    amountVaries: value.schedule !== 'weekly' && value.amountVaries,
   })
 
   const list = kind === 'income' ? 'incomes' : 'payments'
@@ -41,7 +42,7 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
 
   const row = (item: Template, isPast: boolean) => {
     const amount = Number(item.default_amount) / 100
-    const detail = [scheduleText(item), accountName(item.account_id), kind === 'payment' ? categoryName(item.category_id) : item.amount_varies ? 'сумма меняется' : ''].filter(Boolean).join(' · ')
+    const detail = [scheduleText(item), accountName(item.account_id), kind === 'payment' ? categoryName(item.category_id) : '', item.amount_varies ? 'сумма меняется' : ''].filter(Boolean).join(' · ')
     const lastMonth = !isPast && item.active_to !== null
     return <div className={isPast ? 'row is-muted' : 'row'} key={item.id}>
       <div className="row-main"><strong>{item.name}{lastMonth && <Badge tone="warn">последний месяц</Badge>}</strong><span className="row-meta">{detail}</span></div>

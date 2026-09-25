@@ -3,13 +3,15 @@
 import { useState } from 'react'
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
 import { Button, Empty, RowMenu } from '@/components/ui'
+import { toCents } from '@/lib/api-client'
+import { money } from '@/lib/format'
 import AccountDialog, { type AccountValue } from './AccountDialog'
 import { send } from './api'
 import { kindOptions, type AccountRow, type Preview, type Run } from './types'
 
 const body = (account: AccountRow, patch: Partial<AccountRow>) => {
   const next = { ...account, ...patch }
-  return { name: next.name, kind: next.kind, canFundTransfers: next.can_fund_transfers, priority: next.transfer_priority, version: next.version }
+  return { name: next.name, kind: next.kind, canFundTransfers: next.can_fund_transfers, priority: next.transfer_priority, version: next.version, sweepToAccountId: next.sweep_to_account_id ?? null, keepAmount: Number(next.keep_amount ?? 0) }
 }
 
 export default function AccountsTab({ accounts, csrfToken, run }: { accounts: AccountRow[]; csrfToken: string; run: Run }) {
@@ -29,15 +31,25 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
       (lists) => ({ ...lists, accounts: lists.accounts.map((account) => ({ ...account, transfer_priority: changes.find((change) => change.account.id === account.id)?.priority ?? account.transfer_priority })) }))
   }
 
+  const fields = (value: AccountValue): Partial<AccountRow> => ({ name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers, sweep_to_account_id: value.sweepToAccountId, keep_amount: toCents(value.keepAmount) })
+  const detail = (account: AccountRow) => {
+    const kind = kindOptions.find((option) => option.value === account.kind)?.label
+    if (account.kind === 'business') {
+      const target = accounts.find((item) => item.id === account.sweep_to_account_id)?.name
+      const keep = Number(account.keep_amount ?? 0)
+      return [kind, target ? `остаток → ${target}` : 'остаток никуда не переводится', keep > 0 ? `запас ${money(keep / 100)}` : ''].filter(Boolean).join(' · ')
+    }
+    return `${kind}${account.can_fund_transfers ? '' : ' · не для переводов'}`
+  }
   const save = (value: AccountValue) => {
     const current = editing === 'new' ? null : editing
     setEditing(null)
     void run(() => current
-      ? send(`/api/accounts/${current.id}`, 'PUT', csrfToken, body(current, { name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers }))
-      : send('/api/accounts', 'POST', csrfToken, { name: value.name, kind: value.kind, canFundTransfers: value.canFundTransfers, priority: (active.length + 1) * 10 }),
+      ? send(`/api/accounts/${current.id}`, 'PUT', csrfToken, body(current, fields(value)))
+      : send('/api/accounts', 'POST', csrfToken, { name: value.name, kind: value.kind, canFundTransfers: value.canFundTransfers, priority: (active.length + 1) * 10, sweepToAccountId: value.sweepToAccountId, keepAmount: toCents(value.keepAmount) }),
     current ? 'Счёт сохранён.' : 'Счёт добавлен.',
-    current ? patch(current.id, { name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers })
-      : (lists) => ({ ...lists, accounts: [...lists.accounts, { id: `new-${crypto.randomUUID()}`, name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers, transfer_priority: (active.length + 1) * 10, is_archived: false, version: 0 }] }))
+    current ? patch(current.id, fields(value))
+      : (lists) => ({ ...lists, accounts: [...lists.accounts, { id: `new-${crypto.randomUUID()}`, transfer_priority: (active.length + 1) * 10, is_archived: false, version: 0, ...fields(value) } as AccountRow] }))
   }
 
   return <section className="card">
@@ -46,7 +58,7 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     {active.length === 0 && <Empty>Счетов пока нет.</Empty>}
     <div className="rows">
       {active.map((account, index) => <div className="row" key={account.id}>
-        <div className="row-main"><strong>{account.name}</strong><span className="row-meta">{kindOptions.find((option) => option.value === account.kind)?.label}{account.can_fund_transfers ? '' : ' · не для переводов'}</span></div>
+        <div className="row-main"><strong>{account.name}</strong><span className="row-meta">{detail(account)}</span></div>
         <div className="row-side">
           <Button variant="ghost" size="sm" aria-label={`Выше: ${account.name}`} icon={<ArrowUp size={16} />} disabled={index === 0} onClick={() => void move(index, -1)} />
           <Button variant="ghost" size="sm" aria-label={`Ниже: ${account.name}`} icon={<ArrowDown size={16} />} disabled={index === active.length - 1} onClick={() => void move(index, 1)} />
@@ -59,6 +71,6 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     </div>
     {archived.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowArchived(!showArchived)}>{showArchived ? 'Скрыть архив' : `Архив · ${archived.length}`}</button>}
     {showArchived && <div className="rows">{archived.map((account) => <div className="row is-muted" key={account.id}><div className="row-main"><strong>{account.name}</strong></div></div>)}</div>}
-    {editing && <AccountDialog account={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSave={save} />}
+    {editing && <AccountDialog account={editing === 'new' ? null : editing} accounts={accounts} onClose={() => setEditing(null)} onSave={save} />}
   </section>
 }

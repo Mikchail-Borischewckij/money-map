@@ -29,8 +29,10 @@ export default function TemplateDialog({ kind, value, accounts, categories, onCl
       <Field label={weekly ? 'Цена за раз' : 'Сумма'}><MoneyInput label="Сумма" value={form.amount} onChange={(amount) => set({ amount })} /></Field>
       <Field label={kind === 'payment' ? 'Со счёта' : 'На счёт'}><Select label="Счёт" value={form.accountId} options={accounts.map((account) => ({ value: account.id, label: account.name }))} onChange={(accountId) => set({ accountId })} /></Field>
       {kind === 'payment' && <Field label="Категория"><Select label="Категория" value={form.categoryId} placeholder="Без категории" options={[{ value: '', label: 'Без категории' }, ...categories.map((category) => ({ value: category.id, label: category.name }))]} onChange={(categoryId) => set({ categoryId })} /></Field>}
-      {kind === 'income' && <div className="field-wide"><Checkbox checked={form.amountVaries} onChange={(amountVaries) => set({ amountVaries })}>Сумма меняется от месяца к месяцу</Checkbox>
-        {form.amountVaries && <p className="note">Укажите сумму, на которую можно рассчитывать наверняка. В каждом месяце её нужно будет уточнить, а до этого итог будет предварительным.</p>}</div>}
+      {!weekly && <div className="field-wide"><Checkbox checked={form.amountVaries} onChange={(amountVaries) => set({ amountVaries })}>Сумма меняется от месяца к месяцу</Checkbox>
+        {form.amountVaries && <p className="note">{kind === 'income'
+          ? 'Укажите сумму, на которую можно рассчитывать наверняка. В каждом месяце её нужно будет уточнить, а до этого итог будет предварительным.'
+          : 'Укажите примерную сумму. В каждом месяце её нужно будет уточнить, а до этого итог будет предварительным.'}</p>}</div>}
       {weekly && <p className="note field-wide">В месяце: цена × число этих дней. Количество можно поправить в самом месяце.</p>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <button type="submit" hidden />

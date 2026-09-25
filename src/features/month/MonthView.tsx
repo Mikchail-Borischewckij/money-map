@@ -4,6 +4,7 @@ import BalancesSection from './BalancesSection'
 import IncomesSection from './IncomesSection'
 import PaymentsSection from './PaymentsSection'
 import SummaryCard from './SummaryCard'
+import TransfersSection from './TransfersSection'
 import type { MonthActions, UpdatePlan } from './utils'
 
 // One month as five steps plus the summary. A closed month renders the same layout without inputs.
@@ -19,9 +20,10 @@ export default function MonthView({ plan, summary, readOnly, update, categories,
       <IncomesSection plan={plan} readOnly={readOnly} update={update} accountName={accountName} accounts={liveAccounts} onReset={actions.onResetIncome} />
       <PaymentsSection plan={plan} readOnly={readOnly} update={update} accountName={accountName} accounts={liveAccounts} categories={categories} onReset={actions.onResetPayment} />
       <AllocationSection plan={plan} readOnly={readOnly} update={update} accounts={liveAccounts} accountName={accountName} />
+      <TransfersSection summary={summary} accountName={accountName} />
     </div>
     <aside className="month-summary">
-      <SummaryCard summary={summary} accountName={accountName} />
+      <SummaryCard summary={summary} />
       {footer}
     </aside>
   </div>

@@ -56,3 +56,61 @@ describe('server money calculation in grosz', () => {
     expect(calculateMoneyPlan(plan).totalAvailable).toBe(30)
   })
 })
+
+describe('business account', () => {
+  const plan = (): MoneyPlan => ({
+    month: '2026-10',
+    accounts: [
+      { id: 'business', name: 'Бизнес', kind: 'business', openingBalance: 1_500_000, canFundTransfers: false, priority: 1, sweepToAccountId: 'personal', keepAmount: 50_000 },
+      { id: 'personal', name: 'Личный', kind: 'current', openingBalance: 0, canFundTransfers: true, priority: 2 },
+      { id: 'bills', name: 'Платежи', kind: 'current', openingBalance: 0, canFundTransfers: false, priority: 3 },
+    ],
+    incomes: [],
+    payments: [
+      { id: 'tax', name: 'Налоги', amount: 320_000, accountId: 'business', due: '', enabled: true, category: '' },
+      { id: 'accountant', name: 'Бухгалтер', amount: 40_000, accountId: 'business', due: '', enabled: true, category: '' },
+      { id: 'rent', name: 'Аренда', amount: 350_000, accountId: 'bills', due: '', enabled: true, category: '' },
+    ],
+    allocations: [],
+  })
+
+  it('sends everything above its payments and reserve to the personal account in one transfer', () => {
+    const result = calculateMoneyPlan(plan())
+    expect(result.transfers.map(({ fromAccountId, toAccountId, amount, kind }) => [fromAccountId, toAccountId, amount, kind])).toEqual([
+      ['business', 'personal', 1_090_000, 'sweep'],
+      ['personal', 'bills', 350_000, 'cover'],
+    ])
+    const business = result.accounts.find((account) => account.id === 'business')!
+    expect(business.remaining).toBe(50_000)
+    expect(result.accounts.find((account) => account.id === 'personal')!.remaining).toBe(740_000)
+    expect(result.freeAfterPlan).toBe(740_000)
+  })
+
+  it('never tops up other accounts directly, even when allowed to fund transfers', () => {
+    const value = plan()
+    value.accounts[0].canFundTransfers = true
+    value.accounts[0].sweepToAccountId = null
+    const result = calculateMoneyPlan(value)
+    expect(result.transfers.some((transfer) => transfer.fromAccountId === 'business')).toBe(false)
+    expect(result.uncovered).toBe(350_000)
+  })
+
+  it('is topped up from the personal account when its payments exceed what it has', () => {
+    const value = plan()
+    value.accounts[0].openingBalance = 300_000
+    value.accounts[1].openingBalance = 1_000_000
+    const result = calculateMoneyPlan(value)
+    expect(result.transfers.filter((transfer) => transfer.fromAccountId === 'business')).toHaveLength(0)
+    expect(result.transfers.find((transfer) => transfer.toAccountId === 'business')?.amount).toBe(110_000)
+  })
+
+  it('keeps a payment with a changing amount preliminary until checked', () => {
+    const value = plan()
+    value.accounts.forEach((account) => { account.balanceConfirmed = true })
+    expect(calculateMoneyPlan(value).isPreliminary).toBe(false)
+    value.payments[0].amountPending = true
+    expect(calculateMoneyPlan(value).isPreliminary).toBe(true)
+    value.payments[0].enabled = false
+    expect(calculateMoneyPlan(value).isPreliminary).toBe(false)
+  })
+})

@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { Button, Dialog, Field, MoneyInput, Select, TextInput } from '@/components/ui'
-import type { Account } from '@/lib/domain'
+import type { Account, Plan } from '@/lib/domain'
 import { dayOptions } from '@/lib/format'
-import { dayInMonth } from './utils'
+import { dateIn } from '@/lib/period'
 
 export type OneOffValue = { name: string; amount: number; accountId: string; day: number | null; category: string }
 
-export default function OneOffDialog({ kind, month, accounts, categories, onClose, onSave }: {
-  kind: 'income' | 'payment'; month: string; accounts: Account[]; categories: string[]
+export default function OneOffDialog({ kind, plan, accounts, categories, onClose, onSave }: {
+  kind: 'income' | 'payment'; plan: Plan; accounts: Account[]; categories: string[]
   onClose: () => void; onSave: (value: OneOffValue) => void
 }) {
   const [name, setName] = useState('')
@@ -23,7 +23,8 @@ export default function OneOffDialog({ kind, month, accounts, categories, onClos
     if (!accountId) { setError('Выберите счёт.'); return }
     onSave({ name: name.trim(), amount, accountId, day: day ? Number(day) : null, category })
   }
-  const lastDay = Number(dayInMonth(month, 31).slice(8))
+  // A calendar month offers only its own days; a period that starts later can reach any day.
+  const lastDay = (plan.startDay ?? 1) === 1 ? Number(dateIn(plan.month, 31).slice(8)) : 31
   return <Dialog title={kind === 'income' ? 'Разовый доход' : 'Разовый платёж'} onClose={onClose}
     actions={<><Button onClick={onClose}>Отмена</Button><Button variant="primary" onClick={save}>Добавить</Button></>}>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); save() }}>
