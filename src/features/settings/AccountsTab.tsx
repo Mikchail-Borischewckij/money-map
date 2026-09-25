@@ -43,6 +43,9 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     }
     return account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>
   }
+  // An archived account comes back last in the transfer order and appears in the open month again.
+  const restore = (account: AccountRow) => run(() => send(`/api/accounts/${account.id}/restore`, 'POST', csrfToken, { expectedVersion: account.version }), 'Счёт снова в работе. Он появился в открытом месяце.',
+    patch(account.id, { is_archived: false, transfer_priority: (active.length + 1) * 10 }))
   const save = (value: AccountValue) => {
     const current = editing === 'new' ? null : editing
     setEditing(null)
@@ -76,7 +79,10 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
       </tr>)}</tbody>
     </table></div>}
     {archived.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowArchived(!showArchived)}>{showArchived ? 'Скрыть архив' : `Архив · ${archived.length}`}</button>}
-    {showArchived && <table className="data-table"><tbody>{archived.map((account) => <tr className="is-muted" key={account.id}><td className="cell-name">{account.name}</td><td className="col-opt">{kindLabel(account)}</td></tr>)}</tbody></table>}
+    {showArchived && <table className="data-table"><tbody>{archived.map((account) => <tr className="is-muted" key={account.id}>
+      <td className="cell-name">{account.name}</td><td className="col-opt">{kindLabel(account)}</td>
+      <td className="actions"><Button size="sm" onClick={() => void restore(account)}>Вернуть</Button></td>
+    </tr>)}</tbody></table>}
     {editing && <AccountDialog account={editing === 'new' ? null : editing} accounts={accounts} onClose={() => setEditing(null)} onSave={save} />}
   </section>
 }
