@@ -20,7 +20,7 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
   // Most months nothing has moved and every balance is right: one button instead of one click per account.
   const confirmAll = () => update((current) => ({ ...current, accounts: current.accounts.map((account) => account.balanceConfirmed ? account : { ...account, balanceConfirmed: true, balanceDate: today() }) }))
   const left = accounts.length - checked
-  return <Section step={1} title="Сколько сейчас на счетах" open={open} onToggle={onToggle} done={done}
+  return <Section step={1} title="Остатки на счетах" open={open} onToggle={onToggle} done={done}
     total={accounts.length > 0 && money(sum)} meta={progress(checked, accounts.length)}
     action={!readOnly && left > 1 && <Button size="sm" variant="ghost" onClick={confirmAll}>Проверить все</Button>}>
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}

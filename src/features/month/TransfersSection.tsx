@@ -46,7 +46,6 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
       : (current.doneTransfers ?? []).filter((item) => item.id !== transfer.id),
   }))
   return <Section step={step} title="Счета и переводы" open={open} onToggle={onToggle} done={done}
-    total={pending > 0 && `Перевести ${money(summary.transfers.filter((transfer) => !transfer.done).reduce((sum, transfer) => sum + transfer.amount, 0))}`}
     meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, 'Переведено')}>
     <div className="transfer-accounts">
       <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} />

@@ -3,16 +3,26 @@
 
 /* Layout */
 .shell { display: grid; grid-template-columns: 216px minmax(0, 1fr); min-height: 100vh; }
+.shell.sidebar-collapsed { grid-template-columns: 72px minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; align-self: start; height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: var(--space-6); padding: 22px var(--space-3); background: var(--surface); border-right: 1px solid var(--border); }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.2px; }
-.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary); color: #fff; font-size: var(--text-lg); font-weight: 800; }
+.sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.brand { display: flex; align-items: center; gap: 10px; font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.2px; }
+.brand-mark { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--primary); color: #fff; font-size: var(--text-lg); font-weight: 800; }
+.sidebar-toggle { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); cursor: pointer; }
+.sidebar-toggle:hover { background: var(--surface-2); color: var(--text); }
 .nav { display: grid; gap: var(--space-1); }
 .nav-item { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 10px var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font-weight: 500; text-align: left; cursor: pointer; }
+.nav-item svg { flex-shrink: 0; }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item.is-active { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
 .sidebar-foot { margin-top: auto; display: grid; gap: 6px; padding: 14px 10px 0; border-top: 1px solid var(--border); }
 .sidebar-foot .btn { justify-content: flex-start; padding-left: 0; }
 .user { font-size: var(--text-sm); font-weight: 600; color: var(--text-2); }
+.sidebar-collapsed .sidebar-head { justify-content: center; }
+.sidebar-collapsed .brand, .sidebar-collapsed .nav-item span, .sidebar-collapsed .user, .sidebar-collapsed .logout-label { display: none; }
+.sidebar-collapsed .nav-item { justify-content: center; padding: 10px 0; }
+.sidebar-collapsed .sidebar-foot { justify-items: center; padding-left: 0; padding-right: 0; }
+.sidebar-collapsed .sidebar-foot .btn { justify-content: center; width: 40px; padding: 0; }
 .main { min-width: 0; padding: 28px var(--space-6) 56px; }
 /* One column that never grows past the screen: an implicit auto column stretched to wide tables and made phones zoom out. */
 .page { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
@@ -415,7 +425,7 @@
 
 /* Tablet: no sidebar, navigation at the bottom. */
 @media (max-width: 860px) {
-  .shell { grid-template-columns: minmax(0, 1fr); }
+  .shell, .shell.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
   .sidebar { display: none; }
   .main { padding: 18px var(--space-4) 92px; }
   .page { gap: var(--space-4); }

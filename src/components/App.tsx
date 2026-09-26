@@ -16,6 +16,7 @@ import type { View } from './layout/nav'
 export default function App({ initial, nextMonth, csrfToken, displayName }: { initial: ServerRecord; nextMonth: string | null; csrfToken: string; displayName: string }) {
   const month = useMonthPlan({ initial, initialNext: nextMonth, csrfToken })
   const [view, setView] = useState<View>('month')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [categories, setCategories] = useState<CategoryNames>({ payment: [], income: [] })
 
   const loadCategories = useCallback(() => fetch('/api/categories', { cache: 'no-store' }).then((response) => response.ok ? response.json() : [])
@@ -30,8 +31,9 @@ export default function App({ initial, nextMonth, csrfToken, displayName }: { in
     window.location.assign('/')
   }
 
-  return <div className="shell">
-    <Sidebar view={view} onNavigate={setView} displayName={displayName} onLogout={() => void logout()} />
+  return <div className={sidebarCollapsed ? 'shell sidebar-collapsed' : 'shell'}>
+    <Sidebar view={view} onNavigate={setView} displayName={displayName} onLogout={() => void logout()}
+      collapsed={sidebarCollapsed} onToggleCollapsed={() => setSidebarCollapsed((current) => !current)} />
     <main className="main">
       {month.errorText && <div className="alert" role="alert"><span>{month.errorText}</span>
         {month.saveState === 'error' && <Button size="sm" onClick={month.retrySave}>Повторить</Button>}
