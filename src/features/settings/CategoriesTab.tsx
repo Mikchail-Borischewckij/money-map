@@ -55,7 +55,7 @@ export default function CategoriesTab({ categories, csrfToken, run }: { categori
         <Segmented tabs size="sm" label="Категории для" value={kind} onChange={(value) => { setKind(value); setTab('active') }} options={[{ value: 'payment', label: 'Расходы' }, { value: 'income', label: 'Доходы' }]} />
         <ArchiveTabs value={tab} onChange={setTab} archived={archived.length} />
       </div></header>
-    <DataTable key={`${kind}-${tab}`} label="Категории" rows={tab === 'active' ? active : archived} rowKey={(category) => category.id}
+    <DataTable key={`${kind}-${tab}`} label="Категории" columnPrefsKey={`Категории:${kind}`} rows={tab === 'active' ? active : archived} rowKey={(category) => category.id}
       columns={tab === 'active' ? activeColumns : archivedColumns} rowClassName={tab === 'archived' ? () => 'is-muted' : undefined}
       defaultSort={{ key: 'name', dir: 'asc' }} search={(category) => category.name}
       actions={tab === 'active' && <AddButton onClick={() => open(null)} />}

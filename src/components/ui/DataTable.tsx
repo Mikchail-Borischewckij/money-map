@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, GripVertical, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Columns3, Filter, GripVertical, Search, SlidersHorizontal, X } from 'lucide-react'
 import { cx } from '@/lib/format'
 import Button from './Button'
 import Checkbox from './Checkbox'
@@ -41,6 +41,16 @@ const compare = (a: string | number, b: string | number) => typeof a === 'number
 const phoneQuery = '(max-width: 640px)'
 const subscribe = (notify: () => void) => { const query = window.matchMedia(phoneQuery); query.addEventListener('change', notify); return () => query.removeEventListener('change', notify) }
 const usePhone = () => useSyncExternalStore(subscribe, () => window.matchMedia(phoneQuery).matches, () => false)
+
+const columnEvent = 'money-map:table-columns'
+const subscribeColumns = (notify: () => void) => {
+  window.addEventListener('storage', notify)
+  window.addEventListener(columnEvent, notify)
+  return () => { window.removeEventListener('storage', notify); window.removeEventListener(columnEvent, notify) }
+}
+const readHiddenColumns = (key: string) => {
+  try { return window.localStorage.getItem(key) ?? '[]' } catch { return '[]' }
+}
 
 function useOutside(open: boolean, close: () => void) {
   const root = useRef<HTMLDivElement>(null)
@@ -176,10 +186,10 @@ type Reorder<T> = { canMove: (row: T) => boolean; onMove: (keys: string[]) => vo
 
 // The one table of the app: sorting by header, column filters, search, pagination; cards on a phone.
 // With `reorder` the row order is the data itself, so sorting, filters and pages are off.
-export default function DataTable<T>({ rows, columns, rowKey, rowClassName, search, defaultSort, actions, empty, footerLabel = 'Итого', reorder, label, rowTitle }: {
+export default function DataTable<T>({ rows, columns, rowKey, rowClassName, search, defaultSort, actions, empty, footerLabel = 'Итого', reorder, label, rowTitle, columnPrefsKey }: {
   rows: T[]; columns: Column<T>[]; rowKey: (row: T) => string; rowClassName?: (row: T) => string | undefined
   search?: (row: T) => string; defaultSort?: Sort; actions?: React.ReactNode; empty?: React.ReactNode; footerLabel?: string
-  reorder?: Reorder<T>; label: string
+  reorder?: Reorder<T>; label: string; columnPrefsKey?: string
   // With `rowTitle` a phone card opens into a sheet holding the whole row, so the card itself can stay two lines.
   rowTitle?: (row: T) => string
 }) {
@@ -215,16 +225,33 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const [size, setSize] = useState(pageSizes[0])
   const [sheet, setSheet] = useState<string | null>(null)
   const [tuning, setTuning] = useState(false)
+  const [choosingColumns, setChoosingColumns] = useState(false)
   const fixed = Boolean(reorder)
+  const storageKey = `money-map:table-columns:${columnPrefsKey ?? label}`
+  const hiddenSnapshot = useSyncExternalStore(subscribeColumns, () => readHiddenColumns(storageKey), () => '[]')
+  let savedKeys: string[] = []
+  try {
+    const parsed: unknown = JSON.parse(hiddenSnapshot)
+    if (Array.isArray(parsed)) savedKeys = parsed.filter((key): key is string => typeof key === 'string')
+  } catch { /* Ignore invalid or outdated browser settings. */ }
+  const hideable = columns.filter((column, index) => index > 0 && column.mobile !== 'end' && column.className !== 'actions')
+  const hiddenKeys = new Set(savedKeys.filter((key) => hideable.some((column) => column.key === key)))
+  const visibleColumns = columns.filter((column) => !hiddenKeys.has(column.key))
+  const saveHidden = (keys: Set<string>) => {
+    try { window.localStorage.setItem(storageKey, JSON.stringify([...keys])) } catch { /* Keep the current session usable when storage is unavailable. */ }
+    window.dispatchEvent(new Event(columnEvent))
+    setFit({ width: 0, needed: 0 })
+  }
 
   const text = lower(query.trim())
-  const shown = fixed ? rows : rows.filter((row) => (!text || !search || lower(search(row)).includes(text)) && columns.every((column) => {
+  const shown = fixed ? rows : rows.filter((row) => (!text || !search || lower(search(row)).includes(text)) && visibleColumns.every((column) => {
     const value = filters[column.key]
     if (!column.filter || value === undefined) return true
     const cell = column.filter.value(row)
     return Array.isArray(value) ? value.includes(cell) : lower(cell).includes(lower(value.trim()))
   }))
-  const sortColumn = !fixed && sort ? columns.find((column) => column.key === sort.key && column.sort) : undefined
+  const sortColumn = !fixed && sort ? visibleColumns.find((column) => column.key === sort.key && column.sort) : undefined
+  const activeSort = sortColumn ? sort : null
   if (sortColumn?.sort) {
     const pick = sortColumn.sort
     const direction = sort!.dir === 'asc' ? 1 : -1
@@ -243,36 +270,55 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
     setFilters((previous) => { const next = { ...previous }; if (value === undefined) delete next[key]; else next[key] = value; return next })
     setPage(1)
   }
-  const filtered = Object.keys(filters).length > 0 || Boolean(text)
-  const hasFooter = columns.some((column) => column.footer)
+  const filtered = visibleColumns.some((column) => filters[column.key] !== undefined) || Boolean(text)
+  const hasFooter = visibleColumns.some((column) => column.footer)
   const align = (column: Column<T>) => cx(column.align === 'right' && 'num', column.align === 'center' && 'center', column.className)
   const reset = () => { setFilters({}); setQuery(''); setPage(1) }
   const nothing = <p className="dt-nothing muted">Ничего не найдено.</p>
 
   // A phone shows the search box only once the list is long enough to need it; ten rows are faster to scroll.
   const searchable = Boolean(search) && !fixed && (!cards || rows.length > pageSizes[0])
-  const toolbar = searchable || actions || filtered ? <div className={cx('table-toolbar', !searchable && 'is-plain')}>
+  const columnDialog = choosingColumns && <Dialog title="Колонки" onClose={() => setChoosingColumns(false)} actions={<>
+    {hiddenKeys.size > 0 && <Button onClick={() => saveHidden(new Set())}>Показать все</Button>}
+    <Button variant="primary" onClick={() => setChoosingColumns(false)}>Готово</Button>
+  </>}>
+    <div className="dt-column-options">{hideable.map((column) => <Checkbox key={column.key} checked={!hiddenKeys.has(column.key)}
+      onChange={(checked) => {
+        const next = new Set(hiddenKeys)
+        if (checked) next.delete(column.key)
+        else {
+          next.add(column.key)
+          setFilters((previous) => { const updated = { ...previous }; delete updated[column.key]; return updated })
+          if (sort?.key === column.key) setSort(null)
+        }
+        saveHidden(next)
+      }}>
+      {column.header}
+    </Checkbox>)}</div>
+  </Dialog>
+  const toolbar = searchable || actions || filtered || hideable.length > 0 ? <div className={cx('table-toolbar', !searchable && 'is-plain')}>
     {searchable && <label className="table-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Поиск</span>
       <input value={query} placeholder="Поиск" onChange={(event) => { setQuery(event.target.value); setPage(1) }} />
     </label>}
-    {(filtered || actions) && <div className="table-toolbar-actions">
+    {(filtered || actions || hideable.length > 0) && <div className="table-toolbar-actions">
       {filtered && <Button size="sm" icon={<X size={16} />} aria-label="Сбросить фильтры" onClick={reset}><span className="btn-label">Сбросить</span></Button>}
+      {hideable.length > 0 && <Button size="sm" variant="ghost" icon={<Columns3 size={16} />} aria-label="Настроить колонки" onClick={() => setChoosingColumns(true)}><span className="btn-label">Колонки</span></Button>}
       {actions}
     </div>}
   </div> : null
 
-  if (rows.length === 0) return wrapped(<>{toolbar}{empty}</>)
+  if (rows.length === 0) return wrapped(<>{toolbar}{empty}{columnDialog}</>)
 
   const pager = !fixed && shown.length > pageSizes[0] && <Pagination page={current} pages={pages} total={shown.length} size={size} onPage={setPage} onSize={(value) => { setSize(value); setPage(1) }} />
 
   if (cards) {
     const roleOf = (column: Column<T>, index: number) => column.mobile ?? (index === 0 ? 'title' : 'meta')
-    const place = (role: NonNullable<Column<T>['mobile']>) => columns.filter((column, index) => roleOf(column, index) === role)
+    const place = (role: NonNullable<Column<T>['mobile']>) => visibleColumns.filter((column) => roleOf(column, columns.indexOf(column)) === role)
     const [titles, amounts, fulls, metas, ends] = (['title', 'amount', 'full', 'meta', 'end'] as const).map(place)
     const shows = (column: Column<T>) => column.card ?? column.cell
-    const sortable = columns.filter((column) => column.sort && onSort && !column.hideHeader)
-    const filterable = columns.filter((column) => column.filter && onFilter && !column.hideHeader)
-    const activeFilters = Object.keys(filters).length
+    const sortable = visibleColumns.filter((column) => column.sort && onSort && !column.hideHeader)
+    const filterable = visibleColumns.filter((column) => column.filter && onFilter && !column.hideHeader)
+    const activeFilters = visibleColumns.filter((column) => filters[column.key] !== undefined).length
     const openRow = rowTitle ? shown.find((row) => rowKey(row) === sheet) : undefined
     // One button instead of a row of chips per sortable and filterable column, which used to push the first row
     // two or three lines down the screen.
@@ -280,7 +326,7 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
       <Button size="sm" icon={<SlidersHorizontal size={16} />} onClick={() => setTuning(true)}>
         Фильтры{activeFilters > 0 && ` · ${activeFilters}`}
       </Button>
-      {sort && <span className="dt-sort-note">{columns.find((column) => column.key === sort.key)?.header} {sort.dir === 'asc' ? '↑' : '↓'}</span>}
+      {sortColumn && <span className="dt-sort-note">{sortColumn.header} {sort?.dir === 'asc' ? '↑' : '↓'}</span>}
     </div>
     return wrapped(<>
       {toolbar}
@@ -314,13 +360,14 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
         </div>}
       </div>}
       {pager}
+      {columnDialog}
       {tuning && <Dialog title="Фильтры" onClose={() => setTuning(false)} actions={<>
         {filtered && <Button onClick={() => { reset(); setTuning(false) }}>Сбросить</Button>}
         <Button variant="primary" onClick={() => setTuning(false)}>Готово</Button>
       </>}>
         {sortable.length > 0 && <div className="field">
           <span className="field-label">Сортировка</span>
-          <Select label="Сортировка" value={sort ? `${sort.key}:${sort.dir}` : ''} placeholder="По умолчанию"
+          <Select label="Сортировка" value={activeSort ? `${activeSort.key}:${activeSort.dir}` : ''} placeholder="По умолчанию"
             options={sortable.flatMap((column) => [
               { value: `${column.key}:asc`, label: `${column.header} ↑` },
               { value: `${column.key}:desc`, label: `${column.header} ↓` },
@@ -333,7 +380,7 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
         </div>)}
       </Dialog>}
       {openRow !== undefined && <Dialog title={rowTitle!(openRow)} onClose={() => setSheet(null)} actions={<Button variant="primary" onClick={() => setSheet(null)}>Готово</Button>}>
-        {columns.filter((column, index) => !['end', 'title', 'hidden'].includes(roleOf(column, index))).map((column) => <div className="sheet-row" key={column.key}>
+        {visibleColumns.filter((column) => !['end', 'title', 'hidden'].includes(roleOf(column, columns.indexOf(column)))).map((column) => <div className="sheet-row" key={column.key}>
           <span className="field-label">{column.header}</span>
           <div>{column.cell(openRow)}</div>
         </div>)}
@@ -346,22 +393,23 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
     {shown.length === 0 ? nothing : <div className="table-scroll"><table className="data-table" aria-label={label}>
       <thead><tr>
         {reorder && <th className="col-grip"><span className="sr-only">Порядок</span></th>}
-        {columns.map((column) => <th key={column.key} className={align(column)} aria-sort={sort?.key === column.key && !fixed ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
-          <HeaderControl column={column} rows={rows} sort={fixed ? null : sort} onSort={onSort} filters={filters} onFilter={onFilter} />
+        {visibleColumns.map((column) => <th key={column.key} className={align(column)} aria-sort={sort?.key === column.key && !fixed ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+          <HeaderControl column={column} rows={rows} sort={activeSort} onSort={onSort} filters={filters} onFilter={onFilter} />
         </th>)}
       </tr></thead>
       <tbody>{ordered.map((row) => {
         const key = rowKey(row)
         return <tr key={key} ref={ref(key)} className={cx(rowClassName?.(row), dragging === key && 'is-dragging')}>
           {reorder && <td className="col-grip">{handle(row)}</td>}
-          {columns.map((column) => <td key={column.key} className={align(column)}>{column.cell(row)}</td>)}
+          {visibleColumns.map((column) => <td key={column.key} className={align(column)}>{column.cell(row)}</td>)}
         </tr>
       })}</tbody>
       {hasFooter && <tfoot><tr>
         {reorder && <th />}
-        {columns.map((column, index) => <th key={column.key} className={align(column)}>{column.footer ? column.footer(shown) : index === 0 ? footerLabel : null}</th>)}
+        {visibleColumns.map((column, index) => <th key={column.key} className={align(column)}>{column.footer ? column.footer(shown) : index === 0 ? footerLabel : null}</th>)}
       </tr></tfoot>}
     </table></div>}
     {pager}
+    {columnDialog}
   </>)
 }
