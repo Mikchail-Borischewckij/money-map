@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, GripVertical, Search } from 'lucide-react'
 import { cx } from '@/lib/format'
 import Button from './Button'
@@ -54,18 +54,32 @@ function useOutside(open: boolean, close: () => void) {
 }
 
 function FilterMenu<T>({ column, rows, value, onChange }: { column: Column<T> & { filter: ColumnFilter<T> }; rows: T[]; value: string[] | string | undefined; onChange: (value: string[] | string | undefined) => void }) {
-  const [open, setOpen] = useState(false)
-  const root = useOutside(open, () => setOpen(false))
+  // The menu is placed against the screen, so a scrolling table does not clip it; it closes when the page scrolls.
+  const [place, setPlace] = useState<{ top: number; left: number } | null>(null)
+  const open = place !== null
+  const root = useOutside(open, () => setPlace(null))
   const id = useId()
+  useEffect(() => {
+    if (!open) return
+    const close = (event: Event) => { if (!(event.target instanceof Node && root.current?.contains(event.target))) setPlace(null) }
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close) }
+  }, [open, root])
+  const toggle = (button: HTMLElement) => {
+    if (open) { setPlace(null); return }
+    const rect = button.getBoundingClientRect()
+    setPlace({ top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 308)) })
+  }
   const filter = column.filter
   const active = Array.isArray(value) ? value.length > 0 : Boolean(value)
   const options = filter.type === 'list' ? [...new Set(rows.map(filter.value))].sort((a, b) => compare(filter.label?.(a) ?? a, filter.label?.(b) ?? b)) : []
   const picked = Array.isArray(value) ? value : []
   return <div className="dt-filter" ref={root}>
-    <button type="button" className={cx('dt-filter-button', active && 'is-active')} aria-label={`Фильтр: ${column.header}`} aria-expanded={open} aria-controls={id} onClick={() => setOpen(!open)}>
+    <button type="button" className={cx('dt-filter-button', active && 'is-active')} aria-label={`Фильтр: ${column.header}`} aria-expanded={open} aria-controls={id} onClick={(event) => toggle(event.currentTarget)}>
       <Filter size={13} />
     </button>
-    {open && <div className="dt-filter-menu" id={id} role="dialog" aria-label={`Фильтр: ${column.header}`}>
+    {place && <div className="dt-filter-menu" id={id} role="dialog" aria-label={`Фильтр: ${column.header}`} style={place}>
       {filter.type === 'text'
         ? <input className="text-input" autoFocus placeholder={column.header} aria-label={column.header} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value || undefined)} />
         : <div className="dt-filter-options">
@@ -74,7 +88,7 @@ function FilterMenu<T>({ column, rows, value, onChange }: { column: Column<T> & 
             {(filter.label?.(option) ?? option) || '—'}
           </Checkbox>)}
         </div>}
-      {active && <button type="button" className="link" onClick={() => { onChange(undefined); setOpen(false) }}>Сбросить</button>}
+      {active && <button type="button" className="link" onClick={() => { onChange(undefined); setPlace(null) }}>Сбросить</button>}
     </div>}
   </div>
 }
@@ -153,6 +167,30 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   reorder?: Reorder<T>; label: string
 }) {
   const phone = usePhone()
+  // Cards also when the table does not fit its container (a laptop next to the summary, a tablet).
+  // `needed` is the table's own width, measured while it is shown as a table.
+  const wrap = useRef<HTMLDivElement>(null)
+  const [fit, setFit] = useState({ width: 0, needed: 0 })
+  useLayoutEffect(() => {
+    const element = wrap.current
+    if (!element) return
+    const measure = () => {
+      const table = element.querySelector('table')
+      const width = element.clientWidth
+      setFit((previous) => {
+        const needed = table && table.offsetWidth > width ? table.offsetWidth : previous.needed
+        return previous.width === width && previous.needed === needed ? previous : { width, needed }
+      })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  })
+  // Widths measured with the fallback font are wrong once the web font arrives: measure again from scratch.
+  useEffect(() => { void document.fonts?.ready.then(() => setFit({ width: 0, needed: 0 })) }, [])
+  const cards = phone || (fit.needed > 0 && fit.width < fit.needed)
+  const wrapped = (node: React.ReactNode) => <div className="dt" ref={wrap}>{node}</div>
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort | null>(defaultSort ?? null)
   const [filters, setFilters] = useState<Filters>({})
@@ -198,15 +236,15 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
     {actions && <div className="table-toolbar-actions">{actions}</div>}
   </div> : null
 
-  if (rows.length === 0) return <>{toolbar}{empty}</>
+  if (rows.length === 0) return wrapped(<>{toolbar}{empty}</>)
 
   const pager = !fixed && shown.length > pageSizes[0] && <Pagination page={current} pages={pages} total={shown.length} size={size} onPage={setPage} onSize={(value) => { setSize(value); setPage(1) }} />
 
-  if (phone) {
+  if (cards) {
     const controls = columns.filter((column) => !column.hideHeader && ((column.sort && onSort) || (column.filter && onFilter)))
     const place = (role: NonNullable<Column<T>['mobile']>) => columns.filter((column, index) => (column.mobile ?? (index === 0 ? 'title' : 'meta')) === role)
     const [titles, amounts, fulls, metas, ends] = (['title', 'amount', 'full', 'meta', 'end'] as const).map(place)
-    return <>
+    return wrapped(<>
       {toolbar}
       {controls.length > 0 && <div className="dt-mobile-head" aria-label="Сортировка и фильтры">
         {controls.map((column) => <HeaderControl key={column.key} column={column} rows={rows} sort={sort} onSort={column.sort ? onSort : undefined} filters={filters} onFilter={onFilter} />)}
@@ -238,10 +276,10 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
         </div>}
       </div>}
       {pager}
-    </>
+    </>)
   }
 
-  return <>
+  return wrapped(<>
     {toolbar}
     {shown.length === 0 ? nothing : <div className="table-scroll"><table className="data-table" aria-label={label}>
       <thead><tr>
@@ -263,5 +301,5 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
       </tr></tfoot>}
     </table></div>}
     {pager}
-  </>
+  </>)
 }

@@ -50,7 +50,7 @@
 .archived-toggle { margin-top: 12px; }
 
 /* Month */
-.month-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.month-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
 .month-sections { display: grid; gap: 20px; min-width: 0; }
 .month-summary { position: sticky; top: 24px; display: grid; gap: 16px; }
 .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
@@ -326,7 +326,7 @@
 .shell { grid-template-columns: 216px minmax(0, 1fr); }
 .sidebar { gap: 24px; padding: 22px 12px; }
 .brand-mark { border-radius: 8px; background: var(--primary); }
-.main { padding: 28px 32px 56px; }
+.main { padding: 28px 24px 56px; }
 .page { max-width: 1320px; gap: 18px; }
 .page-head h1 { font-size: 26px; letter-spacing: -0.45px; }
 .card { min-width: 0; padding: 18px 20px; box-shadow: none; }
@@ -397,6 +397,8 @@
 .btn-primary { box-shadow: 0 1px 1px rgb(0 0 0 / 8%); }
 
 @media (max-width: 860px) {
+  /* Repeats the phone layout: the desktop grid above is declared after the first responsive block. */
+  .shell { grid-template-columns: minmax(0, 1fr); }
   .main { padding: 18px 16px 92px; }
   .page { gap: 14px; }
   .month-summary { order: -1; }
@@ -447,8 +449,7 @@
 .dt-filter-button { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--muted); opacity: .6; cursor: pointer; }
 .dt-filter-button:hover { background: var(--surface-3); opacity: 1; }
 .dt-filter-button.is-active { background: var(--primary-soft); color: var(--primary); opacity: 1; }
-.dt-filter-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; display: grid; gap: 10px; min-width: 220px; max-width: min(300px, calc(100vw - 32px)); padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-pop); text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 400; color: var(--text); text-align: left; }
-.num .dt-filter-menu, .center .dt-filter-menu { left: auto; right: 0; }
+.dt-filter-menu { position: fixed; z-index: 45; display: grid; gap: 10px; min-width: 220px; max-width: min(300px, calc(100vw - 32px)); padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-pop); text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 400; color: var(--text); text-align: left; }
 .dt-filter-options { display: grid; gap: 10px; max-height: 260px; overflow: auto; }
 .dt-filter-menu .link { justify-self: start; }
 .dt-nothing { padding: 16px 0; font-size: 14px; }
@@ -498,5 +499,10 @@
   .table-search { flex-basis: auto; min-width: 0; }
   .pagination { justify-content: center; }
 }
-/* No scroll box around tables: it would clip the header filter menus. Phones get cards instead. */
-.table-scroll { overflow: visible; }
+/* Wide tables scroll inside their card; filter menus are fixed to the screen, so they are not clipped. */
+.table-scroll { overflow-x: auto; }
+.data-table .money-input { width: 120px; }
+.data-table .segmented-sm button { padding: 0 7px; font-size: 12px; }
+.data-table th, .data-table td { padding-left: 8px; padding-right: 8px; }
+.data-table .bank-logo-name { white-space: normal; }
+.data-table .col-check, .data-table thead .center { width: 1%; }
