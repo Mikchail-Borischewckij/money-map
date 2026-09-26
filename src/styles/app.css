@@ -373,7 +373,7 @@
 /* Summary page */
 .summary-controls { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .summary-controls > span { color: var(--muted); font-size: var(--text-sm); font-weight: 600; }
-.summary-controls .select { min-width: 200px; }
+.summary-controls .select { width: min(340px, 100%); min-width: 200px; }
 .money-table { width: 100%; border-collapse: collapse; font-size: var(--text-md); font-variant-numeric: tabular-nums; }
 .money-table th, .money-table td { padding: var(--space-3) 10px; border-top: 1px solid var(--border); text-align: right; white-space: nowrap; }
 .money-table th:first-child { padding-left: 0; text-align: left; white-space: normal; }
@@ -436,6 +436,19 @@
 
 /* Phone. */
 @media (max-width: 640px) {
+  .transfer-accounts .dt-card-meta { display: grid; justify-items: start; gap: 2px; }
+  .transfer-accounts .dt-card-meta > span { display: flex; min-width: 0; }
+  .transfer-list li { grid-template-columns: 24px minmax(0, 1fr) auto var(--tap); gap: 2px 6px; }
+  .transfer-list li::before { grid-column: 1; grid-row: 2; }
+  .transfer-route { display: contents; }
+  .transfer-from, .transfer-to { grid-column: 2 / -1; min-width: 0; }
+  .transfer-from { grid-row: 1; }
+  .transfer-to { grid-row: 3; }
+  .transfer-from .bank-logo, .transfer-to .bank-logo { max-width: 100%; }
+  .transfer-arrow { grid-column: 2; grid-row: 2; align-self: center; }
+  .transfer-list li > .amount { grid-column: 3; grid-row: 2; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .transfer-list li > .checkbox, .transfer-list li > .transfer-check { grid-column: 4; grid-row: 2; }
+  .transfer-route .badge { grid-column: 2 / -1; grid-row: 4; justify-self: start; }
   .main { padding: 14px var(--space-3) 90px; }
   .page-head { align-items: flex-start; }
   .page-head h1 { font-size: var(--text-2xl); }

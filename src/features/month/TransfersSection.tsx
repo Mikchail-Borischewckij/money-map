@@ -48,12 +48,19 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
   return <Section step={step} title="Счета и переводы" open={open} onToggle={onToggle} done={done}
     total={pending > 0 && `Перевести ${money(summary.transfers.filter((transfer) => !transfer.done).reduce((sum, transfer) => sum + transfer.amount, 0))}`}
     meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, 'Переведено')}>
-    <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} />
+    <div className="transfer-accounts">
+      <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} />
+    </div>
     <h3 className="subhead">Что перевести</h3>
     {!readOnly && !ready && summary.transfers.length > 0 && <p className="note">Отметить переводы можно после проверки остатков, доходов и платежей.</p>}
     {summary.transfers.length === 0 ? <p className="muted">Переводы не нужны.</p> : <ol className="transfer-list">
       {summary.transfers.map((transfer) => <li key={transfer.id} className={cx(transfer.done && 'is-done')}>
-        <span className="transfer-route">{accountTag(transfer.fromAccountId)}<ArrowRight size={14} />{accountTag(transfer.toAccountId)}{topUp(transfer) && <Badge tone="warn">Доперевести</Badge>}</span>
+        <span className="transfer-route">
+          <span className="transfer-from">{accountTag(transfer.fromAccountId)}</span>
+          <ArrowRight className="transfer-arrow" size={14} aria-label="Перевести на" />
+          <span className="transfer-to">{accountTag(transfer.toAccountId)}</span>
+          {topUp(transfer) && <Badge tone="warn">Доперевести</Badge>}
+        </span>
         <strong className="amount">{money(transfer.amount)}</strong>
         {readOnly
           ? <span className="transfer-check">{transfer.done && <Check size={16} className="checked-mark" aria-label="Переведено" />}</span>
