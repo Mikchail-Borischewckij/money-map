@@ -152,7 +152,10 @@ it('adds bank identities to accounts and snapshots', async () => {
     for (const file of files) await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
     const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
     await pg.query("INSERT INTO accounts (household_id, name, bank) VALUES ($1, 'Основной', 'pko')", [household])
+    await pg.query("INSERT INTO accounts (household_id, name, bank) VALUES ($1, 'Revolut карта', 'other')", [household])
+    await pg.exec(await readFile(new URL('./migrations/010_backfill_account_banks.sql', import.meta.url), 'utf8'))
     expect((await pg.query<{ bank: string }>("SELECT bank FROM accounts WHERE name = 'Основной'")).rows).toEqual([{ bank: 'pko' }])
+    expect((await pg.query<{ bank: string }>("SELECT bank FROM accounts WHERE name = 'Revolut карта'")).rows).toEqual([{ bank: 'revolut' }])
     await expect(pg.query("INSERT INTO accounts (household_id, name, bank) VALUES ($1, 'Ошибка', 'unknown')", [household])).rejects.toThrow()
   } finally {
     await pg.close()

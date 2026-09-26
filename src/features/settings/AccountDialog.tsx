@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from 'react'
-import { Button, Dialog, Field, MoneyInput, Select, Switch, TextInput } from '@/components/ui'
-import { bankOptions, inferBank, type BankId } from '@/lib/banks'
+import { BankPicker, Button, Dialog, Field, MoneyInput, Select, Switch, TextInput } from '@/components/ui'
+import { inferBank, type BankId } from '@/lib/banks'
 import { kindOptions, type AccountKind, type AccountRow } from './types'
 
 export type AccountValue = { name: string; bank: BankId; kind: AccountKind; canFundTransfers: boolean; sweepToAccountId: string | null; keepAmount: number }
@@ -24,7 +24,7 @@ export default function AccountDialog({ account, accounts, onClose, onSave }: { 
   }
   return <Dialog title={account ? 'Счёт' : 'Новый счёт'} onClose={onClose} actions={<><Button onClick={onClose}>Отмена</Button><Button variant="primary" disabled={!valid} onClick={save}>Сохранить</Button></>}>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); save() }}>
-      <Field label="Банк"><Select label="Банк" value={bank} options={bankOptions} onChange={setBank} /></Field>
+      <Field label="Банк" wide><BankPicker value={bank} onChange={setBank} /></Field>
       <Field label="Название счёта"><TextInput label="Название счёта" value={name} onChange={setName} placeholder="Например, Основной" autoFocus /></Field>
       <Field label="Тип"><Select label="Тип" value={kind} options={kindOptions} onChange={setKind} /></Field>
       {business ? <>

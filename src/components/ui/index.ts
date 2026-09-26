@@ -1,5 +1,7 @@
 export { default as AccountBadge } from './AccountBadge'
 export { default as BankLogo } from './BankLogo'
+export { default as BankIcon } from './BankIcon'
+export { default as BankPicker } from './BankPicker'
 export { Pagination, TableToolbar } from './TableTools'
 export { default as Badge } from './Badge'
 export { default as Button } from './Button'

@@ -328,7 +328,7 @@
 /* Calm, data-first interface */
 .shell { grid-template-columns: 216px minmax(0, 1fr); }
 .sidebar { gap: 24px; padding: 22px 12px; }
-.brand-mark { border-radius: 8px; background: var(--text); }
+.brand-mark { border-radius: 8px; background: var(--primary); }
 .main { padding: 28px 32px 56px; }
 .page { max-width: 1320px; gap: 18px; }
 .page-head h1 { font-size: 26px; letter-spacing: -0.45px; }
@@ -337,28 +337,41 @@
 .card-head p { max-width: 640px; line-height: 1.45; }
 .section-head { margin-bottom: 8px; }
 .step { background: transparent; border: 1px solid var(--border-strong); color: var(--muted); }
-.step.is-done { background: var(--text); border-color: var(--text); }
+.step.is-done { background: var(--primary); border-color: var(--primary); }
 .badge { border-radius: 6px; font-weight: 500; }
-.summary-hero, .summary-hero.is-short { padding: 20px; background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
-.summary-hero span { color: var(--muted); opacity: 1; }
+.summary-hero { padding: 20px; background: radial-gradient(circle at 88% 12%, rgb(255 255 255 / 22%), transparent 38%), var(--primary); color: #fff; border-bottom: 0; box-shadow: 0 14px 30px rgb(37 99 235 / 18%); }
+.summary-hero.is-short { background: radial-gradient(circle at 88% 12%, rgb(255 255 255 / 18%), transparent 38%), var(--danger); box-shadow: 0 14px 30px rgb(220 38 38 / 15%); }
+.summary-hero span { color: #fff; opacity: .86; }
 .summary-hero strong { font-size: 32px; }
-.summary-hero.is-short strong { color: var(--danger); }
-.summary-hero .badge { background: var(--warn-soft); color: var(--warn); }
+.summary-hero.is-short strong { color: #fff; }
+.summary-hero .badge { background: rgb(255 255 255 / 18%); color: #fff; }
 .summary-lines { padding-top: 16px; padding-bottom: 16px; }
 .summary-lines div { align-items: baseline; }
 .next-month { background: var(--surface); border-color: var(--border); }
 
 /* Bank identity replaces decorative account pills. */
 .bank-logo { display: inline-flex; align-items: center; gap: 9px; min-width: 0; max-width: 100%; color: var(--text); vertical-align: middle; }
-.bank-logo-mark { display: grid; place-items: center; flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 11px; font-weight: 800; letter-spacing: -0.3px; }
+.bank-icon { display: inline-grid; place-items: center; flex: 0 0 auto; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.bank-icon img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.bank-icon svg { width: 68%; height: 68%; overflow: visible; }
+.bank-icon-sm { width: 24px; height: 24px; }
+.bank-icon-md { width: 30px; height: 30px; }
+.bank-icon-lg { width: 48px; height: 48px; }
+.bank-icon-credit-agricole { border-color: #078391; background: #078391; }
+.bank-icon-revolut { border-color: #eceff2; }
+.bank-icon-other { color: var(--muted); }
+.bank-icon-other path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 2; }
 .bank-logo-copy { display: grid; min-width: 0; line-height: 1.15; text-align: left; }
 .bank-logo-name { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .bank-logo-copy small { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
-.bank-logo-pko .bank-logo-mark { border-color: #d71920; color: #d71920; }
-.bank-logo-credit-agricole .bank-logo-mark { border-color: #398b3d; color: #246b31; }
-.bank-logo-revolut .bank-logo-mark { border-color: #171a1d; background: #171a1d; color: #fff; }
-.bank-logo-other .bank-logo-mark { color: var(--muted); }
 .account-badge { all: unset; }
+
+.bank-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.bank-option { display: grid; justify-items: center; align-content: center; gap: 8px; min-height: 92px; padding: 10px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-2); cursor: pointer; transition: border-color .18s, background .18s, color .18s, transform .18s; }
+.bank-option span:last-child { font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; text-wrap: balance; }
+.bank-option:hover { border-color: #9bb7f5; background: #f8faff; }
+.bank-option:active { transform: translateY(1px); }
+.bank-option.is-selected { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-ink); box-shadow: inset 0 0 0 1px var(--primary); }
 
 /* Controls sit in a separate band above tables. */
 .table-toolbar { display: flex; align-items: center; gap: 8px; margin: 16px 0 12px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
@@ -422,9 +435,9 @@
   .page > .segmented button { flex: 1 0 auto; }
   .inline-add { flex-wrap: wrap; }
   .inline-add .text-input { min-width: 180px; }
+  .bank-picker { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-color-scheme: dark) {
-  .bank-logo-revolut .bank-logo-mark { border-color: #fff; background: #fff; color: #171a1d; }
   .money-table .is-in { color: #78d8ac; }
 }
