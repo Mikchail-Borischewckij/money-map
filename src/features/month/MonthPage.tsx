@@ -55,7 +55,7 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
     {confirmClose && <Dialog title={`Закрыть ${monthName(plan.month, false).toLowerCase()}?`} onClose={() => setConfirmClose(false)}
       actions={<><Button onClick={() => setConfirmClose(false)}>Отмена</Button><Button variant="primary" onClick={() => { setConfirmClose(false); void month.closeMonth() }}>Закрыть месяц</Button></>}>
       <p>После закрытия месяц можно только смотреть. Изменения в настройках его не затронут.</p>
-      <p className="muted">Итог: {summary.freeAfterPlan < 0 ? 'не хватает' : 'на жизнь'} {money(Math.abs(summary.freeAfterPlan))}.</p>
+      <p className="muted">Итог: {summary.freeAfterPlan < 0 ? 'не хватает' : 'остаток'} {money(Math.abs(summary.freeAfterPlan))}.</p>
     </Dialog>}
   </div>
 }
