@@ -47,7 +47,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
     // Changing the status lives in the row menu, instead of three buttons in every row.
     { key: 'status', header: 'Статус', sort: (income) => incomeStatuses.findIndex((item) => item.value === statusOf(income)),
       filter: { type: 'list', value: statusOf, label: statusLabel },
-      cell: (income) => <Badge tone={statusOf(income) === 'excluded' ? 'neutral' : 'blue'}>{statusLabel(statusOf(income))}</Badge> },
+      cell: (income) => <Badge tone={statusOf(income) === 'excluded' ? 'neutral' : statusOf(income) === 'expected' ? 'warn' : 'blue'}>{statusLabel(statusOf(income))}</Badge> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (income) => income.amount, footer: (rows) => money(total(counted(rows))),
       card: (income) => <strong className="amount">{plainAmount(income.amount)}</strong>,
       cell: (income) => <Amount label={`Сумма: ${income.name}`} value={income.amount} readOnly={locked(income)} plain locked={!readOnly && Boolean(income.checked)}
