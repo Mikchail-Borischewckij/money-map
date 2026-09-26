@@ -23,7 +23,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   const change = (id: string, patch: Partial<Income>) => update((current) => ({ ...current, incomes: current.incomes.map((income) => income.id === id ? { ...income, ...patch } : income) }))
   const remove = (id: string) => update((current) => ({ ...current, incomes: current.incomes.filter((income) => income.id !== id) }))
   const accountName = (id: string) => plan.accounts.find((account) => account.id === id)?.name ?? 'Счёт удалён'
-  const expected = (items: Income[]) => items.filter((income) => income.enabled && income.status === 'expected')
+  const counted = (items: Income[]) => items.filter((income) => income.enabled && income.status !== 'excluded')
   const period = periodOfPlan(plan)
   const isPast = (income: Income) => income.enabled && income.status === 'expected' && beforeBalances(period, income.expectedOn)
   // Excluded incomes need no check, so they are not counted.
@@ -48,7 +48,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
     { key: 'status', header: 'Статус', sort: (income) => incomeStatuses.findIndex((item) => item.value === statusOf(income)),
       filter: { type: 'list', value: statusOf, label: statusLabel },
       cell: (income) => <Badge tone={statusOf(income) === 'excluded' ? 'neutral' : 'blue'}>{statusLabel(statusOf(income))}</Badge> },
-    { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (income) => income.amount, footer: (rows) => money(total(expected(rows))),
+    { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (income) => income.amount, footer: (rows) => money(total(counted(rows))),
       card: (income) => <strong className="amount">{plainAmount(income.amount)}</strong>,
       cell: (income) => <Amount label={`Сумма: ${income.name}`} value={income.amount} readOnly={locked(income)} plain locked={!readOnly && Boolean(income.checked)}
         onChange={(value) => change(income.id, { amount: value, amountPending: false })} /> },
@@ -71,7 +71,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   ]
 
   return <Section step={2} title="Доходы" open={open} onToggle={onToggle} done={done}
-    total={plan.incomes.length > 0 && `Итого ${money(total(expected(plan.incomes)))}`} meta={progress(toCheck.length - unchecked, toCheck.length)}
+    total={plan.incomes.length > 0 && money(total(counted(plan.incomes)))} meta={progress(toCheck.length - unchecked, toCheck.length)}
     action={!readOnly && unchecked > 1 && <Button size="sm" variant="ghost" onClick={confirmAll}>Проверить все</Button>}>
     <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns} rowTitle={(income) => income.name}
       rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
