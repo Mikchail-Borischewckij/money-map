@@ -69,8 +69,8 @@
 }
 
 * { box-sizing: border-box; }
-html { overflow-x: hidden; }
-body { margin: 0; min-width: 320px; min-height: 100vh; overflow-x: hidden; background: var(--bg); }
+/* `clip`, not `hidden`: hidden on both html and body makes body a scroll box and breaks the sticky sidebar. */
+body { margin: 0; min-width: 320px; min-height: 100vh; overflow-x: clip; background: var(--bg); }
 button, input { font: inherit; color: inherit; }
 h1, h2, h3, p { margin: 0; }
 :focus-visible { outline: none; box-shadow: var(--focus); }

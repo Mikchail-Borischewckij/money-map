@@ -1,6 +1,6 @@
 /* Layout */
 .shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
-.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 28px; padding: 24px 14px; background: var(--surface); border-right: 1px solid var(--border); }
+.sidebar { position: sticky; top: 0; align-self: start; height: 100vh; height: 100dvh; display: flex; flex-direction: column; gap: 28px; padding: 24px 14px; background: var(--surface); border-right: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
 .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: linear-gradient(135deg, var(--hero-from), var(--hero-to)); color: #fff; font-size: 15px; font-weight: 800; }
 .nav { display: grid; gap: 4px; }
@@ -11,7 +11,8 @@
 .sidebar-foot .btn { justify-content: flex-start; padding-left: 0; }
 .user { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .main { min-width: 0; padding: 32px 40px 64px; }
-.page { max-width: 1440px; margin: 0 auto; display: grid; gap: 20px; }
+/* One column that never grows past the screen: an implicit auto column stretched to wide tables and made phones zoom out. */
+.page { max-width: 1440px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .page-head h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.6px; }
 .page-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
