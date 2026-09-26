@@ -126,4 +126,21 @@ describe('business account', () => {
     plan.payments[0].amount = 60_000
     expect(calculateMoneyPlan(plan).transfers).toEqual([expect.objectContaining({ fromAccountId: 'main', toAccountId: 'cash', amount: 10_000 })])
   })
+
+  it('counts made transfers as made and adds only what is still missing', () => {
+    const plan: MoneyPlan = { month: '2026-09', incomes: [], allocations: [], accounts: [
+      { id: 'main', name: 'Основной', kind: 'current', openingBalance: 100_000, canFundTransfers: true, priority: 1 },
+      { id: 'bills', name: 'Платежи', kind: 'current', openingBalance: 0, canFundTransfers: false, priority: 2 },
+    ], payments: [{ id: 'rent', name: 'Аренда', amount: 30_000, accountId: 'bills', due: '', enabled: true, category: '' }],
+    doneTransfers: [{ id: 'made', fromAccountId: 'main', toAccountId: 'bills', amount: 28_000 }] }
+    const short = calculateMoneyPlan(plan)
+    expect(short.transfers).toEqual([
+      expect.objectContaining({ id: 'made', amount: 28_000, done: true }),
+      expect.objectContaining({ fromAccountId: 'main', toAccountId: 'bills', amount: 2_000, done: false }),
+    ])
+    plan.payments[0].amount = 25_000
+    const extra = calculateMoneyPlan(plan)
+    expect(extra.transfers).toEqual([expect.objectContaining({ id: 'made', amount: 28_000, done: true })])
+    expect(extra.accounts.find((account) => account.id === 'bills')!.remaining).toBe(3_000)
+  })
 })

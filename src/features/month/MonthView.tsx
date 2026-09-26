@@ -6,7 +6,7 @@ import IncomesSection from './IncomesSection'
 import PaymentsSection from './PaymentsSection'
 import SummaryCard from './SummaryCard'
 import TransfersSection from './TransfersSection'
-import { savingsOf, type MonthActions, type UpdatePlan } from './utils'
+import { readyForTransfers, savingsOf, type MonthActions, type UpdatePlan } from './utils'
 
 // One month as steps plus the summary; "Отложить" is a step only when something is set aside. A closed month renders the same layout without inputs.
 export default function MonthView({ plan, summary, readOnly, update, categories, actions, footer }: {
@@ -24,7 +24,7 @@ export default function MonthView({ plan, summary, readOnly, update, categories,
       <IncomesSection plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} onReset={actions.onResetIncome} />
       <PaymentsSection plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} categories={categories} onReset={actions.onResetPayment} />
       <AllocationSection plan={plan} step={4} readOnly={readOnly} update={update} accounts={liveAccounts} accountName={accountName} />
-      <TransfersSection step={saving ? 5 : 4} summary={summary} accountTag={accountTag} />
+      <TransfersSection step={saving ? 5 : 4} summary={summary} accountTag={accountTag} readOnly={readOnly} ready={readyForTransfers(plan)} update={update} />
     </div>
     <aside className="month-summary">
       <SummaryCard summary={summary} />

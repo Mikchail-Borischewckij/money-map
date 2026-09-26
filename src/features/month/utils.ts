@@ -1,4 +1,4 @@
-import type { Account, Plan } from '@/lib/domain'
+import type { Account, Income, Payment, Plan } from '@/lib/domain'
 import { countFrom, countWeekdaysInPeriod, dayInPeriod, periodEnd, periodStart, type Period } from '@/lib/period'
 
 export type UpdatePlan = (change: (plan: Plan) => Plan) => void
@@ -59,3 +59,13 @@ export const incomeStatuses = [
 ] as const
 
 export const savingsOf = (plan: Plan) => plan.allocations.find((allocation) => allocation.kind === 'savings')
+
+// Every income that is not excluded is checked before the month's transfers: amount and status are then locked.
+export const incomeToCheck = (income: Income) => income.enabled && income.status !== 'excluded' && !income.checked
+export const paymentToCheck = (payment: Payment) => payment.enabled && !payment.checked
+
+// Transfers are marked as made only once everything they are calculated from is checked.
+export const readyForTransfers = (plan: Plan) => {
+  const accounts = plan.accounts.filter((account) => !account.isArchived)
+  return accounts.length > 0 && accounts.every((account) => account.balanceConfirmed) && !plan.incomes.some(incomeToCheck) && !plan.payments.some(paymentToCheck)
+}

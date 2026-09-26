@@ -4,22 +4,24 @@ import { useState } from 'react'
 import { Badge, Button, Dialog } from '@/components/ui'
 import type { MonthPlanState } from '@/hooks/useMonthPlan'
 import { money, monthName, periodTitle } from '@/lib/format'
-import { amountToCheck } from '@/lib/domain'
 import BalancesDate from './BalancesDate'
 import MonthView from './MonthView'
+import { incomeToCheck, paymentToCheck } from './utils'
 
 export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: string[]; onOpenSettings: () => void }) {
   const [confirmClose, setConfirmClose] = useState(false)
   const { plan, summary, open, nextMonth } = month
   const liveAccounts = plan.accounts.filter((account) => !account.isArchived)
   const unchecked = liveAccounts.filter((account) => !account.balanceConfirmed).length
-  const incomesToCheck = plan.incomes.filter(amountToCheck).length
-  // Every payment still planned must be checked before the month can be closed.
-  const paymentsToCheck = plan.payments.filter((payment) => payment.enabled && !payment.checked).length
+  const incomesToCheck = plan.incomes.filter(incomeToCheck).length
+  // Every balance, income and payment must be checked and every transfer made before the month can be closed.
+  const paymentsToCheck = plan.payments.filter(paymentToCheck).length
+  const transfersToMake = summary.transfers.filter((transfer) => !transfer.done).length
   const closeBlocker = liveAccounts.length === 0 ? 'Добавьте счёт в настройках.'
     : unchecked > 0 ? `Проверьте остатки: осталось ${unchecked}.`
-    : incomesToCheck > 0 ? `Уточните суммы доходов: осталось ${incomesToCheck}.`
+    : incomesToCheck > 0 ? `Проверьте доходы: осталось ${incomesToCheck}.`
     : paymentsToCheck > 0 ? `Проверьте платежи: осталось ${paymentsToCheck}.`
+    : transfersToMake > 0 ? `Отметьте переводы: осталось ${transfersToMake}.`
     : month.dirty || month.saveState === 'saving' ? 'Сохраняем изменения…' : ''
   const saveText = month.saveState === 'conflict' ? 'Конфликт' : month.saveState === 'error' ? 'Не сохранено' : month.saveState === 'saving' || month.dirty ? 'Сохраняем…' : 'Сохранено'
   const actions = { onResetPayment: (id: string) => void month.reset('payments', id), onResetIncome: (id: string) => void month.reset('incomes', id), onOpenSettings }

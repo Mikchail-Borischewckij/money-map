@@ -33,6 +33,8 @@ export type Income = {
   recurringIncomeId?: string | null
   // Set while the amount is still the estimate from settings for an income whose amount changes monthly.
   amountPending?: boolean
+  // Amount and status are checked for this month and locked until unchecked.
+  checked?: boolean
 }
 
 export type Payment = {
@@ -73,7 +75,11 @@ export type Plan = {
   incomes: Income[]
   payments: Payment[]
   allocations: Allocation[]
+  // Transfers already made this month, with the amounts they were made for.
+  doneTransfers?: DoneTransfer[]
 }
+
+export type DoneTransfer = { id: string; fromAccountId: string; toAccountId: string; amount: number }
 
 export type AccountSummary = Account & {
   expectedIncome: number
@@ -94,7 +100,8 @@ export type Transfer = {
   fromAccountId: string
   toAccountId: string
   amount: number
-  kind: 'sweep' | 'cover'
+  kind: 'sweep' | 'cover' | 'done'
+  done: boolean
 }
 
 export type PlanSummary = {

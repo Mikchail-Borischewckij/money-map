@@ -19,11 +19,13 @@ export const toPayment = (row: Row): MoneyPayment => ({
 export const toIncome = (row: Row): MoneyIncome => ({
   id: row.id, recurringIncomeId: row.recurring_income_id, name: row.name_snapshot, amount: Number(row.amount), accountId: row.account_id,
   expectedOn: row.expected_date ?? '', enabled: row.is_enabled, status: statusValue(row.status), amountPending: row.amount_pending,
+  checked: row.is_checked,
 })
 
 const incomeRecord = (income: MoneyIncome) => ({
   id: income.id, recurring_income_id: income.recurringIncomeId ?? null, name_snapshot: income.name, amount: income.amount, account_id: income.accountId,
   expected_date: income.expectedOn || null, is_enabled: income.enabled, status: statusText(income.status), amount_pending: Boolean(income.recurringIncomeId && income.amountPending),
+  is_checked: income.enabled && Boolean(income.checked),
 })
 const paymentRecord = (payment: MoneyPayment) => ({
   id: payment.id, recurring_payment_id: payment.recurringPaymentId ?? null, name_snapshot: payment.name, category_snapshot: payment.category, amount: payment.amount,
@@ -35,9 +37,9 @@ const paymentRecord = (payment: MoneyPayment) => ({
 
 // Set-based writes from JSON: one statement however many rows, so writing a month stays a single round trip.
 export const insertIncomes = (tx: Sql, planId: string, version: number, incomes: MoneyIncome[]) => tx`
-  INSERT INTO monthly_incomes (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version, amount_pending)
-  SELECT x.id, ${planId}, x.recurring_income_id, x.name_snapshot, x.amount, x.account_id, x.expected_date, x.is_enabled, x.status, ${version}, x.amount_pending
-  FROM jsonb_to_recordset(${json(incomes.map(incomeRecord))}::text::jsonb) AS x(id uuid, recurring_income_id uuid, name_snapshot text, amount bigint, account_id uuid, expected_date date, is_enabled boolean, status text, amount_pending boolean)`
+  INSERT INTO monthly_incomes (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version, amount_pending, is_checked)
+  SELECT x.id, ${planId}, x.recurring_income_id, x.name_snapshot, x.amount, x.account_id, x.expected_date, x.is_enabled, x.status, ${version}, x.amount_pending, x.is_checked
+  FROM jsonb_to_recordset(${json(incomes.map(incomeRecord))}::text::jsonb) AS x(id uuid, recurring_income_id uuid, name_snapshot text, amount bigint, account_id uuid, expected_date date, is_enabled boolean, status text, amount_pending boolean, is_checked boolean)`
 
 export const insertPayments = (tx: Sql, planId: string, version: number, payments: MoneyPayment[]) => tx`
   INSERT INTO monthly_payments (id, monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, is_enabled, version,
@@ -49,8 +51,8 @@ export const insertPayments = (tx: Sql, planId: string, version: number, payment
 
 export const updateIncomes = (tx: Sql, planId: string, version: number, incomes: MoneyIncome[]) => tx`
   UPDATE monthly_incomes m SET name_snapshot = x.name_snapshot, amount = x.amount, account_id = x.account_id, expected_date = x.expected_date,
-    is_enabled = x.is_enabled, status = x.status, amount_pending = x.amount_pending, version = ${version}
-  FROM jsonb_to_recordset(${json(incomes.map(incomeRecord))}::text::jsonb) AS x(id uuid, name_snapshot text, amount bigint, account_id uuid, expected_date date, is_enabled boolean, status text, amount_pending boolean)
+    is_enabled = x.is_enabled, status = x.status, amount_pending = x.amount_pending, is_checked = x.is_checked, version = ${version}
+  FROM jsonb_to_recordset(${json(incomes.map(incomeRecord))}::text::jsonb) AS x(id uuid, name_snapshot text, amount bigint, account_id uuid, expected_date date, is_enabled boolean, status text, amount_pending boolean, is_checked boolean)
   WHERE m.id = x.id AND m.monthly_plan_id = ${planId}`
 
 export const updatePayments = (tx: Sql, planId: string, version: number, payments: MoneyPayment[]) => tx`

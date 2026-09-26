@@ -113,7 +113,7 @@
 .money-table .negative { color: var(--danger); }
 .subhead { margin-top: 18px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; color: var(--muted); }
 .transfer-list { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: transfer; display: grid; }
-.transfer-list li { counter-increment: transfer; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 15px; }
+.transfer-list li { counter-increment: transfer; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 24px; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 15px; }
 .transfer-list li:first-child { border-top: 0; }
 .transfer-list li::before { content: counter(transfer); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--surface-3); color: var(--text-2); font-size: 12px; font-weight: 700; }
 .transfer-route { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; font-weight: 500; }
@@ -519,3 +519,6 @@
 .table-search input:focus-visible { box-shadow: none; }
 .dt-filter-menu .text-input:focus { border-color: var(--border-strong); background: var(--surface); box-shadow: none; }
 @media (max-width: 640px) { .table-toolbar .btn-label { display: none; } .table-toolbar .btn:has(.btn-label) { width: 36px; padding: 0; } }
+.transfer-list li.is-done .transfer-route, .transfer-list li.is-done .amount { color: var(--muted); }
+.transfer-list li.is-done::before { background: var(--primary); color: #fff; }
+.transfer-check { display: grid; place-items: center; }

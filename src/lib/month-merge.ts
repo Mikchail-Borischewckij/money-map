@@ -32,7 +32,7 @@ const pending = (varies: boolean, open: boolean, followsSettings: boolean, wasPe
 
 // Carries a settings change into the open month. A field follows settings only while the month still has the old
 // settings value; a value changed in the month itself wins and is reported in `kept`. Exclusions and income status stay,
-// and so does a checked payment amount.
+// and so does a checked amount.
 // `beforePeriod` is the period the old values were computed for, when the period itself changed.
 export function mergePayment(period: Period, row: MoneyPayment | null, before: PaymentTemplate | null, after: PaymentTemplate, newId: () => string = () => crypto.randomUUID(), beforePeriod: Period = period): Merge<MoneyPayment> {
   if (!row) return { value: paymentFromTemplate(period, after, newId()), kept: [] }
@@ -73,6 +73,8 @@ export function mergeIncome(period: Period, row: MoneyIncome | null, before: Inc
     if (row[key] !== next[key]) kept.push(label)
     return row[key]
   }
-  const amountPending = pending(after.varies, row.status === 'expected', !old || row.amount === old.amount, row.amountPending, before?.varies)
-  return { value: { ...row, recurringIncomeId: after.id, name: pick('name', 'название'), amount: pick('amount', 'сумма'), accountId: pick('accountId', 'счёт'), expectedOn: pick('expectedOn', 'дата'), amountPending }, kept }
+  const amount = row.checked ? row.amount : pick('amount', 'сумма')
+  if (row.checked && amount !== next.amount) kept.push('сумма')
+  const amountPending = !row.checked && pending(after.varies, row.status === 'expected', !old || row.amount === old.amount, row.amountPending, before?.varies)
+  return { value: { ...row, recurringIncomeId: after.id, name: pick('name', 'название'), amount, accountId: pick('accountId', 'счёт'), expectedOn: pick('expectedOn', 'дата'), amountPending }, kept }
 }

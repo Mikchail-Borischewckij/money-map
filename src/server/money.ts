@@ -1,11 +1,13 @@
 // `sweepToAccountId`: a business account sends everything above its own payments and `keepAmount` to this account in one transfer.
 export type MoneyAccount = { id: string; name: string; bank?: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean; sweepToAccountId?: string | null; keepAmount?: number }
-export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean }
+export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean; checked?: boolean }
 export type MoneyPayment = { id: string; name: string; amount: number; accountId: string; due: string; enabled: boolean; category: string; recurringPaymentId?: string | null; schedule?: 'monthly' | 'weekly' | null; weekdays?: number[] | null; unitPrice?: number | null; quantity?: number | null; exclusionReason?: string; amountPending?: boolean; checked?: boolean }
+// A transfer already made this month; it keeps its amount whatever the plan says later.
+export type MoneyDoneTransfer = { id: string; fromAccountId: string; toAccountId: string; amount: number }
 export type MoneyAllocation = { id: string; name: string; amount: number; accountId: string; kind: 'living' | 'savings' | 'other' }
 // `startDay`: the day of the month the period starts on (1 = calendar month). Set by the server.
 // `balancesOn`: the date the balances are entered on; weekly items count from it.
-export type MoneyPlan = { month: string; startDay?: number; balancesOn?: string | null; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[] }
+export type MoneyPlan = { month: string; startDay?: number; balancesOn?: string | null; accounts: MoneyAccount[]; incomes: MoneyIncome[]; payments: MoneyPayment[]; allocations: MoneyAllocation[]; doneTransfers?: MoneyDoneTransfer[] }
 
 const cents = (value: number) => {
   if (!Number.isSafeInteger(value) || value < 0 || value > 9_000_000_000_000) throw new Error('Invalid money amount')
@@ -24,6 +26,8 @@ export const isBusiness = (account: MoneyAccount) => account.kind === 'business'
 export const hasTransferPriority = (account: Pick<MoneyAccount, 'kind'>) => account.kind !== 'business' && account.kind !== 'cash'
 
 // Transfers, in the order to make them:
+// 0. Transfers already made count as they were made (`done`); everything below only adds what is still missing.
+//    Too much moved is left as it is: the extra stays on the receiving account.
 // 1. Each business account sends everything above its payments and reserve to its personal account, in one transfer.
 // 2. Accounts that cannot cover their payments are topped up from the accounts allowed to fund transfers, in list order.
 //    Business accounts are never used for this: their money reaches other accounts through the personal account.
@@ -39,14 +43,20 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
     return { account, available: opening + expectedIncome, expectedIncome, payments, allocations, keep, incoming: 0n, outgoing: 0n }
   })
   const byId = new Map(base.map((item) => [item.account.id, item]))
-  const transfers: { id: string; fromAccountId: string; toAccountId: string; amount: number; kind: 'sweep' | 'cover' }[] = []
-  const move = (from: typeof base[number], to: typeof base[number], amount: bigint, kind: 'sweep' | 'cover') => {
+  const transfers: { id: string; fromAccountId: string; toAccountId: string; amount: number; kind: 'sweep' | 'cover' | 'done'; done: boolean }[] = []
+  const move = (from: typeof base[number], to: typeof base[number], amount: bigint, kind: 'sweep' | 'cover' | 'done', id = `${from.account.id}-${to.account.id}`) => {
     if (amount <= 0n) return
     from.outgoing += amount
     to.incoming += amount
-    transfers.push({ id: `${from.account.id}-${to.account.id}`, fromAccountId: from.account.id, toAccountId: to.account.id, amount: safeNumber(amount), kind })
+    transfers.push({ id, fromAccountId: from.account.id, toAccountId: to.account.id, amount: safeNumber(amount), kind, done: kind === 'done' })
   }
   const balance = (item: typeof base[number]) => item.available + item.incoming - item.outgoing - item.payments - item.allocations - item.keep
+
+  for (const made of plan.doneTransfers ?? []) {
+    const from = byId.get(made.fromAccountId)
+    const to = byId.get(made.toAccountId)
+    if (from && to && from !== to) move(from, to, cents(made.amount), 'done', made.id)
+  }
 
   for (const item of base) {
     const target = item.account.sweepToAccountId

@@ -177,3 +177,24 @@ it('gives cash accounts their own identity and keeps them out of funding transfe
     await pg.close()
   }
 })
+
+it('stores income checks and made transfers', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    const files = ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql', '004_single_open_month.sql', '005_income_amount_varies.sql', '006_business_accounts.sql', '007_period_start_day.sql', '008_payment_checked.sql', '009_account_banks.sql', '010_backfill_account_banks.sql', '011_cash_accounts.sql', '012_income_checks_and_done_transfers.sql']
+    for (const file of files) await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    const user = (await pg.query<{ id: string }>("INSERT INTO users (household_id, google_subject, initial_email, email, display_name) VALUES ($1, 'sub', 't@example.com', 't@example.com', 'Тест') RETURNING id", [household])).rows[0].id
+    const [main, bills] = (await pg.query<{ id: string }>("INSERT INTO accounts (household_id, name) VALUES ($1, 'Основной'), ($1, 'Платежи') RETURNING id", [household])).rows.map((row) => row.id)
+    const plan = (await pg.query<{ id: string }>('INSERT INTO monthly_plans (household_id, year, month, created_by, updated_by) VALUES ($1, 2026, 9, $2, $2) RETURNING id', [household, user])).rows[0].id
+    await pg.query("INSERT INTO monthly_incomes (monthly_plan_id, name_snapshot, amount, account_id) VALUES ($1, 'Зарплата', 100, $2)", [plan, main])
+    expect((await pg.query('SELECT is_checked FROM monthly_incomes')).rows).toEqual([{ is_checked: false }])
+    await pg.query('INSERT INTO monthly_transfers (monthly_plan_id, from_account_id, to_account_id, amount) VALUES ($1, $2, $3, 500)', [plan, main, bills])
+    await expect(pg.query('INSERT INTO monthly_transfers (monthly_plan_id, from_account_id, to_account_id, amount) VALUES ($1, $2, $2, 500)', [plan, main])).rejects.toThrow()
+    await expect(pg.query('INSERT INTO monthly_transfers (monthly_plan_id, from_account_id, to_account_id, amount) VALUES ($1, $2, $3, 0)', [plan, main, bills])).rejects.toThrow()
+    await pg.query('DELETE FROM monthly_plans WHERE id = $1', [plan])
+    expect((await pg.query('SELECT COUNT(*)::int AS count FROM monthly_transfers')).rows).toEqual([{ count: 0 }])
+  } finally {
+    await pg.close()
+  }
+})

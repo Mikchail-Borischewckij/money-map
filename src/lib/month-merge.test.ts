@@ -106,4 +106,9 @@ describe('moving the open month to another start day', () => {
     const weekly = { ...paymentFromTemplate(month, pool, 'p2'), checked: true }
     expect(mergePayment(month, weekly, pool, { ...pool, amount: 8000 }).value).toMatchObject({ amount: weekly.amount, unitPrice: 7000 })
   })
+  it('keeps the amount of a checked income when settings change', () => {
+    const { value, kept } = mergeIncome(month, { ...salaryRow, checked: true }, salary, { ...salary, amount: 1000000, varies: true })
+    expect(value).toMatchObject({ amount: 900000, checked: true, amountPending: false })
+    expect(kept).toEqual(['сумма'])
+  })
 })

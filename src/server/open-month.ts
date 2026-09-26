@@ -48,7 +48,7 @@ async function paymentRow(tx: Sql, planId: string, templateId: string) {
 }
 
 async function incomeRow(tx: Sql, planId: string, templateId: string) {
-  const rows = await tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending
+  const rows = await tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked
     FROM monthly_incomes WHERE monthly_plan_id = ${planId} AND recurring_income_id = ${templateId} LIMIT 1`
   return rows[0] ? toIncome(rows[0]) : null
 }
@@ -98,7 +98,7 @@ export async function shiftOpenMonth(tx: Sql, session: Session, plan: OpenPlan, 
   const [payments, incomes] = await Promise.all([
     tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
       FROM monthly_payments WHERE monthly_plan_id = ${plan.id}`,
-    tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${plan.id}`,
+    tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked FROM monthly_incomes WHERE monthly_plan_id = ${plan.id}`,
   ])
   const redate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) ? dayInPeriod(after, Number(date.slice(8, 10))) : null
   const nextPayments = await Promise.all(payments.map(toPayment).map(async (row) => {

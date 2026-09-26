@@ -23,7 +23,7 @@ const income = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
   expectedOn: z.union([z.iso.date(), z.literal('')]), enabled: z.boolean(),
   status: z.enum(['expected', 'included', 'excluded']),
-  recurringIncomeId: uuid.nullable().optional(), amountPending: z.boolean().optional(),
+  recurringIncomeId: uuid.nullable().optional(), amountPending: z.boolean().optional(), checked: z.boolean().optional(),
 })
 const payment = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
@@ -33,6 +33,7 @@ const payment = z.object({
   exclusionReason: z.string().max(200).optional(), amountPending: z.boolean().optional(), checked: z.boolean().optional(),
 }).refine((value) => (value.unitPrice == null) === (value.quantity == null), { message: 'Unit price and quantity go together' })
   .refine((value) => value.unitPrice == null || value.amount === value.unitPrice * value.quantity!, { message: 'Amount must equal unit price × quantity' })
+const doneTransfer = z.object({ id: uuid, fromAccountId: uuid, toAccountId: uuid, amount: moneySchema.min(1) }).refine((value) => value.fromAccountId !== value.toAccountId, { message: 'Transfer to the same account' })
 const allocation = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
   kind: z.enum(['living', 'savings', 'other']),
@@ -43,6 +44,7 @@ export const planInput = z.object({
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), startDay: z.number().int().min(1).max(28).optional(), balancesOn: z.iso.date().nullable().optional(),
     accounts: z.array(z.object({ id: uuid, name, bank: bank.optional(), kind: accountKind, openingBalance: moneySchema, balanceConfirmed: z.boolean().optional(), balanceDate: z.iso.date().nullable().optional(), canFundTransfers: z.boolean(), priority: z.number().int().min(0).max(10000), sweepToAccountId: uuid.nullable().optional(), keepAmount: moneySchema.optional() })),
     incomes: z.array(income), payments: z.array(payment), allocations: z.array(allocation),
+    doneTransfers: z.array(doneTransfer).max(200).default([]),
   }),
 }).superRefine((value, context) => {
   const ids = new Set(value.plan.accounts.map((account) => account.id))
@@ -51,6 +53,8 @@ export const planInput = z.object({
     if (new Set(collection.map((item) => item.id)).size !== collection.length) context.addIssue({ code: 'custom', message: 'Duplicate item' })
     if (collection.some((item) => !ids.has(item.accountId))) context.addIssue({ code: 'custom', message: 'Unknown account in plan' })
   }
+  if (new Set(value.plan.doneTransfers.map((item) => item.id)).size !== value.plan.doneTransfers.length) context.addIssue({ code: 'custom', message: 'Duplicate transfer' })
+  if (value.plan.doneTransfers.some((item) => !ids.has(item.fromAccountId) || !ids.has(item.toAccountId))) context.addIssue({ code: 'custom', message: 'Unknown account in transfer' })
 })
 
 export const templateInput = z.object({

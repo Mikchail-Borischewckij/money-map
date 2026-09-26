@@ -20,6 +20,7 @@ export function toUiPlan(plan: MoneyPlan): Plan {
     incomes: plan.incomes.map((income) => ({ ...income, amount: zl(income.amount) })),
     payments: plan.payments.map((payment) => ({ ...payment, amount: zl(payment.amount), unitPrice: payment.unitPrice == null ? null : zl(payment.unitPrice) })),
     allocations: plan.allocations.map((allocation) => ({ ...allocation, amount: zl(allocation.amount) })),
+    doneTransfers: (plan.doneTransfers ?? []).map((transfer) => ({ ...transfer, amount: zl(transfer.amount) })),
   }
 }
 
@@ -61,5 +62,6 @@ export function toApiPlan(plan: Plan): MoneyPlan {
       return { ...payment, unitPrice, amount: unitPrice * payment.quantity }
     }),
     allocations: plan.allocations.map((allocation) => ({ ...allocation, amount: toCents(allocation.amount) })),
+    doneTransfers: (plan.doneTransfers ?? []).map((transfer) => ({ ...transfer, amount: toCents(transfer.amount) })),
   }
 }

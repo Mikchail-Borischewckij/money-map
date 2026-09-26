@@ -1,6 +1,7 @@
 import { db, intArray } from './db'
 import type { Session } from './auth'
-import { calculateMoneyPlan, type MoneyIncome, type MoneyPayment, type MoneyPlan } from './money'
+import { calculateMoneyPlan, type MoneyPlan } from './money'
+import { insertIncomes, insertPayments, isoDate } from './month-rows'
 import { periodOfPlan, templateAt, type OpenPlan } from './open-month'
 import { planInput } from './validation'
 import { incomeFromTemplate, paymentFromTemplate, whenever, type IncomeTemplate, type PaymentTemplate } from '../lib/month-merge'
@@ -73,36 +74,7 @@ export async function periodStartDay(sql: Sql, householdId: string) {
   return (rows[0]?.period_start_day as number | undefined) ?? 1
 }
 
-const statusText = (status: 'expected' | 'included' | 'excluded') => status === 'expected' ? 'Expected' : status === 'included' ? 'IncludedInOpeningBalance' : 'Excluded'
-const isoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 const json = (rows: object[]) => JSON.stringify(rows)
-
-// Set-based inserts from JSON: one statement however many rows, so writing a month stays a single round trip.
-export function insertIncomes(tx: Sql, planId: string, version: number, incomes: MoneyIncome[]) {
-  const rows = incomes.map((income) => ({
-    id: income.id, recurring_income_id: income.recurringIncomeId ?? null, name_snapshot: income.name, amount: income.amount, account_id: income.accountId,
-    expected_date: income.expectedOn || null, is_enabled: income.enabled, status: statusText(income.status), amount_pending: Boolean(income.recurringIncomeId && income.amountPending),
-  }))
-  return tx`INSERT INTO monthly_incomes (id, monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id, expected_date, is_enabled, status, version, amount_pending)
-    SELECT x.id, ${planId}, x.recurring_income_id, x.name_snapshot, x.amount, x.account_id, x.expected_date, x.is_enabled, x.status, ${version}, x.amount_pending
-    FROM jsonb_to_recordset(${json(rows)}::text::jsonb) AS x(id uuid, recurring_income_id uuid, name_snapshot text, amount bigint, account_id uuid, expected_date date, is_enabled boolean, status text, amount_pending boolean)`
-}
-
-export function insertPayments(tx: Sql, planId: string, version: number, payments: MoneyPayment[]) {
-  const rows = payments.map((payment) => ({
-    id: payment.id, recurring_payment_id: payment.recurringPaymentId ?? null, name_snapshot: payment.name, category_snapshot: payment.category, amount: payment.amount,
-    account_id: payment.accountId, due_date: isoDate(payment.due), is_enabled: payment.enabled,
-    schedule_snapshot: payment.recurringPaymentId ? payment.schedule ?? null : null, weekdays_snapshot: intArray(payment.recurringPaymentId ? payment.weekdays : null),
-    unit_price: payment.unitPrice ?? null, quantity: payment.quantity ?? null, exclusion_reason: payment.enabled ? '' : payment.exclusionReason ?? '',
-    amount_pending: Boolean(payment.recurringPaymentId && payment.amountPending), is_checked: payment.enabled && Boolean(payment.checked),
-  }))
-  return tx`INSERT INTO monthly_payments (id, monthly_plan_id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date, is_enabled, version,
-      schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked)
-    SELECT x.id, ${planId}, x.recurring_payment_id, x.name_snapshot, x.category_snapshot, x.amount, x.account_id, x.due_date, x.is_enabled, ${version},
-      x.schedule_snapshot, x.weekdays_snapshot::integer[], x.unit_price, x.quantity, x.exclusion_reason, x.amount_pending, x.is_checked
-    FROM jsonb_to_recordset(${json(rows)}::text::jsonb) AS x(id uuid, recurring_payment_id uuid, name_snapshot text, category_snapshot text, amount bigint, account_id uuid,
-      due_date date, is_enabled boolean, schedule_snapshot text, weekdays_snapshot text, unit_price bigint, quantity integer, exclusion_reason text, amount_pending boolean, is_checked boolean)`
-}
 
 // A month started after its first day has its balances entered today, so what already happened is not counted again.
 export function balancesDate(period: Period, today = warsawDate()) {
@@ -166,14 +138,15 @@ export async function readPlan(session: Session, id: string) {
   if (!rows[0]) return null
   const record = rows[0]
   const open = record.status === 'Draft'
-  const [accounts, balances, incomes, payments, allocations] = await Promise.all([
+  const [accounts, balances, incomes, payments, allocations, done] = await Promise.all([
     // An open month follows the account settings; a closed month keeps the names and settings it was closed with.
     open
       ? db()`SELECT a.id, a.name, a.bank, a.type, a.can_fund_transfers, a.transfer_priority, a.display_order, a.version, a.is_archived, a.sweep_to_account_id, a.keep_amount
         FROM accounts a WHERE a.household_id = ${session.householdId} AND (a.is_archived = false
         OR EXISTS (SELECT 1 FROM monthly_incomes i WHERE i.monthly_plan_id = ${id} AND i.account_id = a.id)
         OR EXISTS (SELECT 1 FROM monthly_payments p WHERE p.monthly_plan_id = ${id} AND p.account_id = a.id)
-        OR EXISTS (SELECT 1 FROM allocations l WHERE l.monthly_plan_id = ${id} AND l.account_id = a.id))
+        OR EXISTS (SELECT 1 FROM allocations l WHERE l.monthly_plan_id = ${id} AND l.account_id = a.id)
+        OR EXISTS (SELECT 1 FROM monthly_transfers t WHERE t.monthly_plan_id = ${id} AND a.id IN (t.from_account_id, t.to_account_id)))
         ORDER BY a.display_order, a.created_at, a.id`
       : db()`SELECT a.id, COALESCE(b.name_snapshot, a.name) AS name,
       COALESCE(b.bank_snapshot, a.bank) AS bank,
@@ -186,14 +159,16 @@ export async function readPlan(session: Session, id: string) {
       (b.account_id IS NOT NULL
       OR EXISTS (SELECT 1 FROM monthly_incomes i WHERE i.monthly_plan_id = ${id} AND i.account_id = a.id)
       OR EXISTS (SELECT 1 FROM monthly_payments p WHERE p.monthly_plan_id = ${id} AND p.account_id = a.id)
-      OR EXISTS (SELECT 1 FROM allocations l WHERE l.monthly_plan_id = ${id} AND l.account_id = a.id))
+      OR EXISTS (SELECT 1 FROM allocations l WHERE l.monthly_plan_id = ${id} AND l.account_id = a.id)
+      OR EXISTS (SELECT 1 FROM monthly_transfers t WHERE t.monthly_plan_id = ${id} AND a.id IN (t.from_account_id, t.to_account_id)))
       ORDER BY a.display_order, a.created_at, a.id`,
     db()`SELECT account_id, amount, is_confirmed, balance_date::text FROM account_balances WHERE monthly_plan_id = ${id}`,
-    db()`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending FROM monthly_incomes WHERE monthly_plan_id = ${id} ORDER BY id`,
+    db()`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked FROM monthly_incomes WHERE monthly_plan_id = ${id} ORDER BY id`,
     db()`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled,
       schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
       FROM monthly_payments WHERE monthly_plan_id = ${id} ORDER BY id`,
     db()`SELECT id, name, type, amount, account_id FROM allocations WHERE monthly_plan_id = ${id} ORDER BY id`,
+    db()`SELECT id, from_account_id, to_account_id, amount FROM monthly_transfers WHERE monthly_plan_id = ${id} ORDER BY id`,
   ])
   const balanceMap = new Map(balances.map((balance) => [balance.account_id, balance]))
   const plan: MoneyPlan = {
@@ -208,9 +183,10 @@ export async function readPlan(session: Session, id: string) {
         sweepToAccountId: account.sweep_to_account_id ?? null, keepAmount: Number(account.keep_amount ?? 0),
       }
     }),
-    incomes: incomes.map((income) => ({ id: income.id, recurringIncomeId: income.recurring_income_id, name: income.name_snapshot, amount: Number(income.amount), accountId: income.account_id, expectedOn: income.expected_date ?? '', enabled: income.is_enabled, status: income.status === 'Expected' ? 'expected' : income.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: income.amount_pending })),
+    incomes: incomes.map((income) => ({ id: income.id, recurringIncomeId: income.recurring_income_id, name: income.name_snapshot, amount: Number(income.amount), accountId: income.account_id, expectedOn: income.expected_date ?? '', enabled: income.is_enabled, status: income.status === 'Expected' ? 'expected' : income.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: income.amount_pending, checked: income.is_checked })),
     payments: payments.map((payment) => ({ id: payment.id, recurringPaymentId: payment.recurring_payment_id, name: payment.name_snapshot, amount: Number(payment.amount), accountId: payment.account_id, due: payment.due_date ?? whenever, enabled: payment.is_enabled, category: payment.category_snapshot, schedule: payment.schedule_snapshot, weekdays: payment.weekdays_snapshot, unitPrice: payment.unit_price === null ? null : Number(payment.unit_price), quantity: payment.quantity, exclusionReason: payment.exclusion_reason, amountPending: payment.amount_pending, checked: payment.is_checked })),
     allocations: allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, amount: Number(allocation.amount), accountId: allocation.account_id, kind: allocation.type })),
+    doneTransfers: done.map((transfer) => ({ id: transfer.id, fromAccountId: transfer.from_account_id, toAccountId: transfer.to_account_id, amount: Number(transfer.amount) })),
   }
   return { id: record.id as string, version: record.version as number, status: record.status as 'Draft' | 'Finalized', updatedAt: record.updated_at, updatedBy: record.updated_by_name, balanceDate: record.balance_date, plan, summary: calculateMoneyPlan(plan) }
 }
@@ -249,6 +225,7 @@ export async function savePlan(session: Session, id: string, value: unknown) {
       tx`DELETE FROM monthly_incomes WHERE monthly_plan_id = ${id}`,
       tx`DELETE FROM monthly_payments WHERE monthly_plan_id = ${id}`,
       tx`DELETE FROM allocations WHERE monthly_plan_id = ${id}`,
+      tx`DELETE FROM monthly_transfers WHERE monthly_plan_id = ${id}`,
       tx`INSERT INTO account_balances (monthly_plan_id, account_id, amount, balance_date, is_confirmed, name_snapshot, bank_snapshot, type_snapshot, can_fund_transfers_snapshot, transfer_priority_snapshot, sweep_to_snapshot, keep_amount_snapshot)
         SELECT ${id}, a.id, x.amount, x.balance_date, x.is_confirmed, a.name, a.bank, a.type, a.can_fund_transfers, a.transfer_priority, a.sweep_to_account_id, a.keep_amount
         FROM jsonb_to_recordset(${json(balances)}::text::jsonb) AS x(account_id uuid, amount bigint, balance_date date, is_confirmed boolean)
@@ -259,6 +236,10 @@ export async function savePlan(session: Session, id: string, value: unknown) {
         SELECT x.id, ${id}, x.name, x.type, x.amount, x.account_id, ${newVersion}
         FROM jsonb_to_recordset(${json(plan.allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, type: allocation.kind, amount: allocation.amount, account_id: allocation.accountId })))}::text::jsonb)
         AS x(id uuid, name text, type text, amount bigint, account_id uuid)`,
+      tx`INSERT INTO monthly_transfers (id, monthly_plan_id, from_account_id, to_account_id, amount)
+        SELECT x.id, ${id}, x.from_account_id, x.to_account_id, x.amount
+        FROM jsonb_to_recordset(${json(plan.doneTransfers.map((transfer) => ({ id: transfer.id, from_account_id: transfer.fromAccountId, to_account_id: transfer.toAccountId, amount: transfer.amount })))}::text::jsonb)
+        AS x(id uuid, from_account_id uuid, to_account_id uuid, amount bigint)`,
       tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
         VALUES (${session.householdId}, ${session.userId}, 'MonthlyPlan', ${id}, 'update', ${current[0].version}, ${newVersion})`,
     ])
@@ -293,8 +274,12 @@ export async function changePlanStatus(session: Session, id: string, action: 'fi
         OR EXISTS (SELECT 1 FROM accounts a LEFT JOIN account_balances b ON b.account_id = a.id AND b.monthly_plan_id = ${id}
           WHERE a.household_id = ${session.householdId} AND a.is_archived = false AND b.account_id IS NULL)
         OR EXISTS (SELECT 1 FROM monthly_payments WHERE monthly_plan_id = ${id} AND is_enabled AND NOT is_checked)
+        OR EXISTS (SELECT 1 FROM monthly_incomes WHERE monthly_plan_id = ${id} AND is_enabled AND status <> 'Excluded' AND NOT is_checked)
       ) AS missing, (SELECT COUNT(*) FROM account_balances WHERE monthly_plan_id = ${id}) AS account_count`
       if (incomplete[0].missing || Number(incomplete[0].account_count) === 0) return 'incomplete'
+      // Every transfer the plan needs must be made (marked done) before the month is closed.
+      const record = await readPlan(session, id)
+      if (record?.summary.transfers.some((transfer) => !transfer.done)) return 'incomplete'
       await tx`UPDATE account_balances b SET name_snapshot = a.name, bank_snapshot = a.bank, type_snapshot = a.type,
         can_fund_transfers_snapshot = a.can_fund_transfers, transfer_priority_snapshot = a.transfer_priority,
         sweep_to_snapshot = a.sweep_to_account_id, keep_amount_snapshot = a.keep_amount
@@ -335,7 +320,7 @@ async function resetItem(session: Session, kind: 'payment' | 'income', planId: s
       const value = incomeFromTemplate(period, template as IncomeTemplate, itemId)
       await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, amount = ${value.amount},
         account_id = ${value.accountId}, expected_date = ${value.expectedOn || null},
-        is_enabled = true, status = 'Expected', amount_pending = ${Boolean(value.amountPending)}, version = ${newVersion} WHERE id = ${itemId}`
+        is_enabled = true, status = 'Expected', amount_pending = ${Boolean(value.amountPending)}, is_checked = false, version = ${newVersion} WHERE id = ${itemId}`
     }
     await Promise.all([
       tx`UPDATE monthly_plans SET version = ${newVersion}, updated_by = ${session.userId}, updated_at = now() WHERE id = ${planId}`,
