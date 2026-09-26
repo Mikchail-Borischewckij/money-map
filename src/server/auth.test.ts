@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { allowedEmails, canUseGoogleIdentity, validMutation, type Session } from './auth'
+import { allowedEmails, canUseGoogleIdentity, hasAppOrigin, resolveAppOrigin, validMutation, type Session } from './auth'
 
 const previous = { first: process.env.ALLOWED_GOOGLE_EMAIL_1, second: process.env.ALLOWED_GOOGLE_EMAIL_2, origin: process.env.APP_ORIGIN }
 afterEach(() => {
@@ -40,5 +40,14 @@ describe('server authorization rules', () => {
     expect(validMutation(request('https://other.example', 'secret'), session)).toBe(false)
     expect(validMutation(request('https://family.example'), session)).toBe(false)
     expect(validMutation(request('https://family.example', 'wrong'), session)).toBe(false)
+  })
+
+  it('uses the request origin locally and the configured origin in production', () => {
+    expect(resolveAppOrigin('http://localhost:3100/api/auth/login', 'development', 'https://family.example')).toBe('http://localhost:3100')
+    expect(resolveAppOrigin('https://preview.example/api/auth/login', 'production', 'https://family.example')).toBe('https://family.example')
+    expect(hasAppOrigin('development')).toBe(true)
+    expect(hasAppOrigin('production', 'https://family.example')).toBe(true)
+    expect(hasAppOrigin('production', 'https://family.example/path')).toBe(false)
+    expect(hasAppOrigin('production')).toBe(false)
   })
 })

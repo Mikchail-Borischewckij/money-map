@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto'
 import { NextResponse } from 'next/server'
-import { allowedEmails, randomToken } from '@/server/auth'
+import { allowedEmails, hasAppOrigin, randomToken, resolveAppOrigin } from '@/server/auth'
 
-export async function GET() {
-  if (allowedEmails().length === 0 || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.APP_ORIGIN || !process.env.DATABASE_URL) {
+export async function GET(request: Request) {
+  if (allowedEmails().length === 0 || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !hasAppOrigin() || !process.env.DATABASE_URL) {
     return new Response('Authentication is not configured', { status: 503 })
   }
   const state = randomToken()
   const nonce = randomToken()
   const verifier = randomToken()
   const challenge = createHash('sha256').update(verifier).digest('base64url')
-  const callback = new URL('/api/auth/callback', process.env.APP_ORIGIN).toString()
+  const callback = new URL('/api/auth/callback', resolveAppOrigin(request.url)).toString()
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
   url.search = new URLSearchParams({
     client_id: process.env.GOOGLE_CLIENT_ID,

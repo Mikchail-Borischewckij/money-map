@@ -11,7 +11,7 @@
     "lint": "oxlint",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node scripts/migrate.mjs"
+    "db:migrate": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.development.local scripts/migrate.mjs"
   },
   "dependencies": {
     "jose": "^6.2.12",

@@ -1,5 +1,5 @@
 import App from '@/components/App'
-import { allowedEmails, getSession } from '@/server/auth'
+import { allowedEmails, getSession, hasAppOrigin } from '@/server/auth'
 import { currentMonth } from '@/server/plans'
 
 export const dynamic = 'force-dynamic'
@@ -8,7 +8,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ e
   const session = await getSession()
   if (!session) {
     const { error } = await searchParams
-    const configured = Boolean(process.env.DATABASE_URL && process.env.APP_ORIGIN && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && allowedEmails().length > 0)
+    const configured = Boolean(process.env.DATABASE_URL && hasAppOrigin() && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && allowedEmails().length > 0)
     return <main className="login">
       <div className="login-card">
         <div className="brand"><span className="brand-mark">M</span>MoneyMap</div>

@@ -33,6 +33,25 @@ export function canUseGoogleIdentity(email: string, emailVerified: boolean, host
 export function randomToken() { return randomBytes(32).toString('base64url') }
 export function hashToken(token: string) { return createHash('sha256').update(token).digest('hex') }
 
+export function resolveAppOrigin(
+  requestUrl: string,
+  environment = process.env.NODE_ENV,
+  configuredOrigin = process.env.APP_ORIGIN,
+) {
+  if (environment !== 'production') return new URL(requestUrl).origin
+  if (!configuredOrigin) throw new Error('APP_ORIGIN is required in production')
+  return new URL(configuredOrigin).origin
+}
+
+export function hasAppOrigin(environment = process.env.NODE_ENV, configuredOrigin = process.env.APP_ORIGIN) {
+  if (environment !== 'production') return true
+  try {
+    return Boolean(configuredOrigin && new URL(configuredOrigin).origin === configuredOrigin.replace(/\/$/, ''))
+  } catch {
+    return false
+  }
+}
+
 export async function getSession(): Promise<Session | null> {
   const token = (await cookies()).get(sessionCookie)?.value
   if (!token || allowedEmails().length === 0 || !process.env.DATABASE_URL) return null
@@ -56,7 +75,7 @@ export async function getSession(): Promise<Session | null> {
 
 export function validMutation(request: Request, session: Session) {
   const origin = request.headers.get('origin')
-  const expectedOrigin = process.env.APP_ORIGIN ?? new URL(request.url).origin
+  const expectedOrigin = resolveAppOrigin(request.url)
   const supplied = request.headers.get('x-csrf-token')
   if (origin !== expectedOrigin || !supplied) return false
   const left = Buffer.from(supplied)

@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { canUseGoogleIdentity, hashToken, randomToken, sessionCookie } from '@/server/auth'
+import { canUseGoogleIdentity, hashToken, hasAppOrigin, randomToken, resolveAppOrigin, sessionCookie } from '@/server/auth'
 import { db } from '@/server/db'
 
 const googleKeys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
@@ -16,9 +16,10 @@ export async function GET(request: Request) {
   if (!state || !nonce || !verifier || !code || url.searchParams.get('state') !== state) {
     return NextResponse.redirect(new URL('/?error=login', request.url))
   }
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.APP_ORIGIN) {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !hasAppOrigin()) {
     return new Response('Authentication is not configured', { status: 503 })
   }
+  const appOrigin = resolveAppOrigin(request.url)
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: new URL('/api/auth/callback', process.env.APP_ORIGIN).toString(),
+      redirect_uri: new URL('/api/auth/callback', appOrigin).toString(),
       grant_type: 'authorization_code',
       code_verifier: verifier,
     }),
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
   const csrf = randomToken()
   await db()`INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at)
     VALUES (${hashToken(token)}, ${rows[0].id}, ${csrf}, now() + interval '30 days')`
-  const response = NextResponse.redirect(new URL('/', process.env.APP_ORIGIN))
+  const response = NextResponse.redirect(new URL('/', appOrigin))
   const settings = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/' }
   response.cookies.set(sessionCookie, token, { ...settings, maxAge: 60 * 60 * 24 * 30 })
   for (const name of ['mm_oidc_state', 'mm_oidc_nonce', 'mm_oidc_verifier']) response.cookies.set(name, '', { ...settings, maxAge: 0 })
