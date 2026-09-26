@@ -20,11 +20,14 @@ const safeNumber = (value: bigint) => {
 export const amountToCheck = (item: MoneyIncome | MoneyPayment) => Boolean(item.amountPending) && item.enabled && (!('status' in item) || item.status === 'expected')
 
 export const isBusiness = (account: MoneyAccount) => account.kind === 'business'
+// Business and cash accounts are never a source for covering other accounts, so they have no place in the transfer order.
+export const hasTransferPriority = (account: Pick<MoneyAccount, 'kind'>) => account.kind !== 'business' && account.kind !== 'cash'
 
 // Transfers, in the order to make them:
 // 1. Each business account sends everything above its payments and reserve to its personal account, in one transfer.
 // 2. Accounts that cannot cover their payments are topped up from the accounts allowed to fund transfers, in list order.
 //    Business accounts are never used for this: their money reaches other accounts through the personal account.
+//    Cash is never a source either; it can still be topped up (a withdrawal).
 export function calculateMoneyPlan(plan: MoneyPlan) {
   const ids = new Set(plan.accounts.map((account) => account.id))
   const base = plan.accounts.map((account) => {
@@ -53,7 +56,7 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
 
   const ordered = [...base].sort((a, b) => a.account.priority - b.account.priority || a.account.id.localeCompare(b.account.id))
   const targets = ordered.filter((item) => balance(item) < 0n).map((item) => ({ item, remaining: -balance(item) }))
-  const sources = ordered.filter((item) => item.account.canFundTransfers && !isBusiness(item.account) && balance(item) > 0n)
+  const sources = ordered.filter((item) => item.account.canFundTransfers && hasTransferPriority(item.account) && balance(item) > 0n)
   for (const target of targets) {
     for (const source of sources) {
       if (target.remaining === 0n) break

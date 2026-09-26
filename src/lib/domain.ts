@@ -1,5 +1,6 @@
 import { toApiPlan, toUiSummary } from './api-client'
 import { calculateMoneyPlan } from '../server/money'
+export { hasTransferPriority } from '../server/money'
 import type { BankId } from './banks'
 
 export type AccountKind = 'current' | 'savings' | 'cash' | 'business'

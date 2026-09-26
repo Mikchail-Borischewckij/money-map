@@ -113,4 +113,17 @@ describe('business account', () => {
     value.payments[0].enabled = false
     expect(calculateMoneyPlan(value).isPreliminary).toBe(false)
   })
+  it('never takes money from cash but can top cash up', () => {
+    const plan: MoneyPlan = { month: '2026-09', incomes: [], allocations: [], accounts: [
+      { id: 'cash', name: 'Наличные', kind: 'cash', openingBalance: 50_000, canFundTransfers: true, priority: 1 },
+      { id: 'main', name: 'Основной', kind: 'current', openingBalance: 10_000, canFundTransfers: true, priority: 2 },
+      { id: 'bills', name: 'Платежи', kind: 'current', openingBalance: 0, canFundTransfers: false, priority: 3 },
+    ], payments: [{ id: 'rent', name: 'Аренда', amount: 20_000, accountId: 'bills', due: '', enabled: true, category: '' }] }
+    const result = calculateMoneyPlan(plan)
+    expect(result.transfers).toEqual([expect.objectContaining({ fromAccountId: 'main', toAccountId: 'bills', amount: 10_000 })])
+    expect(result.uncovered).toBe(10_000)
+    plan.payments[0].accountId = 'cash'
+    plan.payments[0].amount = 60_000
+    expect(calculateMoneyPlan(plan).transfers).toEqual([expect.objectContaining({ fromAccountId: 'main', toAccountId: 'cash', amount: 10_000 })])
+  })
 })

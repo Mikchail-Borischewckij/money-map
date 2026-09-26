@@ -1,12 +1,12 @@
-import { bankName, inferBank, type BankId } from '@/lib/banks'
+import { inferBank, type BankId } from '@/lib/banks'
 import { cx } from '@/lib/format'
 import BankIcon from './BankIcon'
 
-export default function BankLogo({ bank, name, compact = false }: { bank?: BankId | string | null; name?: string; compact?: boolean }) {
-  const id = (bank || inferBank(name ?? '')) as BankId
-  const label = bankName(id)
-  return <span className={cx('bank-logo', `bank-logo-${id}`, compact && 'is-compact')} aria-label={name ? `${label}, ${name}` : label}>
-    <BankIcon bank={id} />
-    {!compact && <span className="bank-logo-copy"><span className="bank-logo-name">{label}</span>{name && name !== label && <small>{name}</small>}</span>}
+// An account as its bank icon plus the account's own name; the icon already says which bank it is.
+export default function BankLogo({ bank, name, compact = false }: { bank?: BankId | string | null; name: string; compact?: boolean }) {
+  const id = (bank || inferBank(name)) as BankId
+  return <span className={cx('bank-logo', `bank-logo-${id}`, compact && 'is-compact')} title={compact ? name : undefined}>
+    <BankIcon bank={id} size="sm" />
+    {compact ? <span className="sr-only">{name}</span> : <span className="bank-logo-name">{name}</span>}
   </span>
 }

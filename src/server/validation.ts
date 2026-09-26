@@ -4,7 +4,7 @@ export const moneySchema = z.number().int().min(0).max(9_000_000_000_000)
 export const uuid = z.string().uuid()
 const name = z.string().trim().min(1).max(160)
 const accountKind = z.enum(['current', 'savings', 'cash', 'business'])
-const bank = z.enum(['pko', 'credit-agricole', 'revolut', 'other'])
+const bank = z.enum(['pko', 'credit-agricole', 'revolut', 'other', 'cash'])
 const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7).refine((days) => new Set(days).size === days.length, { message: 'Duplicate weekday' })
 
 export const accountInput = z.object({

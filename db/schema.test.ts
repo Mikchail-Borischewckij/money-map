@@ -161,3 +161,19 @@ it('adds bank identities to accounts and snapshots', async () => {
     await pg.close()
   }
 })
+
+it('gives cash accounts their own identity and keeps them out of funding transfers', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    const files = ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql', '004_single_open_month.sql', '005_income_amount_varies.sql', '006_business_accounts.sql', '007_period_start_day.sql', '008_payment_checked.sql', '009_account_banks.sql', '010_backfill_account_banks.sql']
+    for (const file of files) await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    await pg.query("INSERT INTO accounts (household_id, name, bank, type, can_fund_transfers) VALUES ($1, 'Наличные', 'other', 'cash', true)", [household])
+    await pg.query("INSERT INTO accounts (household_id, name, bank, type) VALUES ($1, 'Основной', 'pko', 'current')", [household])
+    await pg.exec(await readFile(new URL('./migrations/011_cash_accounts.sql', import.meta.url), 'utf8'))
+    expect((await pg.query("SELECT bank, can_fund_transfers FROM accounts WHERE name = 'Наличные'")).rows).toEqual([{ bank: 'cash', can_fund_transfers: false }])
+    expect((await pg.query("SELECT bank FROM accounts WHERE name = 'Основной'")).rows).toEqual([{ bank: 'pko' }])
+  } finally {
+    await pg.close()
+  }
+})
