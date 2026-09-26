@@ -41,11 +41,11 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
         ...(isPast(income) && !income.checked ? [{ label: 'Уже получен?', reason: 'Дата раньше даты расчёта. Доход может быть уже на счёте' }] : []),
       ]} />
     </span> },
-    { key: 'account', header: 'Счёт', sort: (income) => accountName(income.accountId), filter: { type: 'list', value: (income) => income.accountId, label: accountName }, cell: (income) => accountTag(income.accountId) },
-    { key: 'when', header: 'Когда', sort: (income) => isDate(income.expectedOn) ? income.expectedOn : '9', cell: (income) => <span className="muted">{dayText(income.expectedOn)}</span> },
+    { key: 'account', header: 'Счёт', mobileLabel: true, sort: (income) => accountName(income.accountId), filter: { type: 'list', value: (income) => income.accountId, label: accountName }, cell: (income) => accountTag(income.accountId) },
+    { key: 'when', header: 'Когда', mobileLabel: true, sort: (income) => isDate(income.expectedOn) ? income.expectedOn : '9', cell: (income) => <span className="muted">{dayText(income.expectedOn)}</span> },
     // Show the status even when an expected income has no specific date.
     // Changing the status lives in the row menu, instead of three buttons in every row.
-    { key: 'status', header: 'Статус', sort: (income) => incomeStatuses.findIndex((item) => item.value === statusOf(income)),
+    { key: 'status', header: 'Статус', mobileLabel: true, sort: (income) => incomeStatuses.findIndex((item) => item.value === statusOf(income)),
       filter: { type: 'list', value: statusOf, label: statusLabel },
       cell: (income) => <Badge tone={statusOf(income) === 'excluded' ? 'neutral' : statusOf(income) === 'expected' ? 'warn' : 'blue'}>{statusLabel(statusOf(income))}</Badge> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (income) => income.amount, footer: (rows) => money(total(counted(rows))),
@@ -73,11 +73,13 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   return <Section step={2} title="Доходы" open={open} onToggle={onToggle} done={done}
     total={plan.incomes.length > 0 && money(total(counted(plan.incomes)))} meta={progress(toCheck.length - unchecked, toCheck.length)}
     action={!readOnly && unchecked > 1 && <Button size="sm" variant="ghost" onClick={confirmAll}>Проверить все</Button>}>
-    <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns} rowTitle={(income) => income.name}
-      rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
-      defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Итого"
-      actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
-      empty={<Empty>Доходов пока нет. Регулярные доходы добавляются в настройках.</Empty>} />
+    <div className="income-rows">
+      <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns} rowTitle={(income) => income.name}
+        rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
+        defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Итого"
+        actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
+        empty={<Empty>Доходов пока нет. Регулярные доходы добавляются в настройках.</Empty>} />
+    </div>
     {adding && <OneOffDialog kind="income" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
       onSave={({ name, amount: value, accountId, day, category }) => {
         update((current) => ({ ...current, incomes: [...current.incomes, { id: crypto.randomUUID(), name, amount: value, accountId, expectedOn: day ? dayInPlan(current, day) : '', enabled: true, status: 'expected', category }] }))

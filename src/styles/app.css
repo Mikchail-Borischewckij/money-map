@@ -436,8 +436,16 @@
 
 /* Phone. */
 @media (max-width: 640px) {
-  .transfer-accounts .dt-card-meta { display: grid; justify-items: start; gap: 2px; }
-  .transfer-accounts .dt-card-meta > span { display: flex; min-width: 0; }
+  .transfer-accounts .dt-card-meta, .income-rows .dt-card-meta { display: grid; justify-items: start; gap: 2px; }
+  .transfer-accounts .dt-card-meta > span, .income-rows .dt-card-meta > span { display: flex; min-width: 0; }
+  .balances-rows .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); }
+  .balances-rows .row-main { grid-column: 1; grid-row: 1; }
+  .balances-rows .row-side { display: contents; }
+  .balances-rows .balance-current { grid-column: 2; grid-row: 1; justify-self: end; }
+  .balances-rows .balance-current .amount-locked { min-width: 0; padding: 0; }
+  .balances-rows .balance-current .money-input { margin: 0; }
+  .balances-rows .balance-keep { grid-column: 1 / -1; grid-row: 2; order: initial; }
+  .balances-rows .balance-check { grid-column: 1 / -1; grid-row: 3; }
   .transfer-list li { grid-template-columns: 24px minmax(0, 1fr) auto var(--tap); gap: 2px 6px; }
   .transfer-list li::before { grid-column: 1; grid-row: 2; }
   .transfer-route { display: contents; }

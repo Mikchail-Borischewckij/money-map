@@ -24,20 +24,20 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
     total={accounts.length > 0 && money(sum)} meta={progress(checked, accounts.length)}
     action={!readOnly && left > 1 && <Button size="sm" variant="ghost" onClick={confirmAll}>Проверить все</Button>}>
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}
-    <div className="rows">
+    <div className="rows balances-rows">
       {accounts.map((account) => <div className="row" key={account.id}>
         <div className="row-main"><strong><AccountBadge name={account.name} bank={account.bank} /></strong></div>
         <div className="row-side">
           {/* A checked row is closed: neither the balance nor the amount to keep can move. Untick it to change them. */}
-          <Amount label={`Сколько на счёте: ${account.name}`} value={account.openingBalance} readOnly={locked(account)} locked={!readOnly && Boolean(account.balanceConfirmed)} className="amount-locked"
-            onChange={(openingBalance) => change(account.id, { openingBalance })} />
+          <span className="balance-current"><Amount label={`Сколько на счёте: ${account.name}`} value={account.openingBalance} readOnly={locked(account)} locked={!readOnly && Boolean(account.balanceConfirmed)} className="amount-locked"
+            onChange={(openingBalance) => change(account.id, { openingBalance })} /></span>
           {/* What must stay on the account this month (a fee, a reserve); starts from the account setting. */}
-          {(!locked(account) || Boolean(account.keepAmount)) && <span className="keep-field"><span>Оставить</span>
+          {(!locked(account) || Boolean(account.keepAmount)) && <span className="keep-field balance-keep"><span>Оставить</span>
             <Amount label={`Оставить на счёте: ${account.name}`} value={account.keepAmount ?? 0} readOnly={locked(account)} locked={!readOnly && Boolean(account.balanceConfirmed)}
               onChange={(keepAmount) => change(account.id, { keepAmount })} /></span>}
-          {readOnly
-            ? account.balanceConfirmed && <Check size={16} className="checked-mark" aria-label="Проверено" />
-            : <Checkbox checked={account.balanceConfirmed ?? false} onChange={(balanceConfirmed) => change(account.id, { balanceConfirmed, balanceDate: balanceConfirmed ? today() : null })}>Проверено</Checkbox>}
+          {(!readOnly || account.balanceConfirmed) && <span className="balance-check">{readOnly
+            ? <Check size={16} className="checked-mark" aria-label="Проверено" />
+            : <Checkbox checked={account.balanceConfirmed ?? false} onChange={(balanceConfirmed) => change(account.id, { balanceConfirmed, balanceDate: balanceConfirmed ? today() : null })}>Проверено</Checkbox>}</span>}
         </div>
       </div>)}
     </div>
