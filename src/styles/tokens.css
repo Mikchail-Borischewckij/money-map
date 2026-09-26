@@ -1,3 +1,4 @@
+/* The whole visual scale of the app. Nothing outside this file invents a size, a radius or a colour. */
 :root {
   --bg: #f6f7f8;
   --surface: #ffffff;
@@ -22,11 +23,44 @@
   --warn-soft: #fff4e0;
   --ok: #0369a1;
   --ok-soft: #e3f3fd;
-  --radius: 12px;
+  --in: #11734b;
+
+  /* Type: eight sizes, nothing between them. */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-3xl: 26px;
+  --text-hero: 32px;
+
+  /* Control heights. `--tap` is the smallest thing a finger may have to hit. */
+  --control-sm: 30px;
+  --control-md: 36px;
+  --control-lg: 40px;
+  --control-xl: 46px;
+  --tap: 44px;
+
+  /* Space, in fours. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --radius-xs: 6px;
   --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 20px;
+  --radius-pill: 99px;
+
   --shadow: none;
   --shadow-pop: 0 12px 32px rgb(15 23 42 / 14%), 0 2px 6px rgb(15 23 42 / 8%);
+  --shadow-summary: 0 16px 34px rgb(37 99 235 / 12%);
   --focus: 0 0 0 3px rgb(37 99 235 / 28%);
+
   color-scheme: light;
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text);
@@ -61,8 +95,10 @@
     --warn-soft: #33260c;
     --ok: #5cc4f5;
     --ok-soft: #0e2a40;
+    --in: #78d8ac;
     --shadow: 0 1px 2px rgb(0 0 0 / 30%);
     --shadow-pop: 0 16px 40px rgb(0 0 0 / 50%);
+    --shadow-summary: 0 16px 40px rgb(0 0 0 / 50%);
     --focus: 0 0 0 3px rgb(79 141 255 / 40%);
     color-scheme: dark;
   }
