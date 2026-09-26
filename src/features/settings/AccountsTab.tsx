@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp } from 'lucide-react'
 import { AccountBadge, AddButton, Button, DataTable, Empty, RowMenu, type Column } from '@/components/ui'
 import { toCents } from '@/lib/api-client'
 import { hasTransferPriority } from '@/lib/domain'
@@ -39,6 +39,15 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
       (lists) => ({ ...lists, accounts: lists.accounts.map((account) => ({ ...account, transfer_priority: changes.find((change) => change.account.id === account.id)?.priority ?? account.transfer_priority })) }))
   }
 
+  // One step up or down with the arrow buttons; dragging does the same in one go.
+  const step = (account: AccountRow, delta: number) => {
+    const keys = order.map((item) => item.id)
+    const index = keys.indexOf(account.id)
+    keys.splice(index, 1)
+    keys.splice(index + delta, 0, account.id)
+    reorder(keys)
+  }
+
   const fields = (value: AccountValue): Partial<AccountRow> => ({ name: value.name, bank: value.bank, kind: value.kind, can_fund_transfers: value.canFundTransfers, sweep_to_account_id: value.sweepToAccountId, keep_amount: toCents(value.keepAmount) })
   const badge = (id: string) => {
     const account = accounts.find((item) => item.id === id)
@@ -72,10 +81,16 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     { key: 'name', header: 'Счёт', mobile: 'title', cell: (account) => badge(account.id) },
     { key: 'kind', header: 'Тип', cell: kindLabel },
     { key: 'transfers', header: 'Переводы', cell: transfers },
-    { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (account) => <RowMenu label={`Действия: ${account.name}`} items={[
-      { label: 'Изменить', onSelect: () => setEditing(account) },
-      { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
-    ]} /> },
+    { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (account) => <div className="cell-actions">
+      {ranked(account) && <>
+        <Button variant="ghost" size="sm" aria-label={`Выше: ${account.name}`} icon={<ArrowUp size={16} />} disabled={order.indexOf(account) === 0} onClick={() => step(account, -1)} />
+        <Button variant="ghost" size="sm" aria-label={`Ниже: ${account.name}`} icon={<ArrowDown size={16} />} disabled={order.indexOf(account) === order.length - 1} onClick={() => step(account, 1)} />
+      </>}
+      <RowMenu label={`Действия: ${account.name}`} items={[
+        { label: 'Изменить', onSelect: () => setEditing(account) },
+        { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
+      ]} />
+    </div> },
   ]
   const archivedColumns: Column<AccountRow>[] = [
     { key: 'name', header: 'Счёт', mobile: 'title', sort: (account) => account.name, cell: (account) => badge(account.id) },

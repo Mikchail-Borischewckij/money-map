@@ -6,8 +6,10 @@ import { cx } from '@/lib/format'
 import type { Option } from './option'
 
 // Listbox-style select: button plus popup list, arrow keys, Enter, Escape and click outside.
+// The list is fixed to the screen under (or above) the button, so it never makes a dialog or a table scroll.
 export default function Select<T extends string>({ value, options, onChange, label, placeholder = 'Выберите', disabled, compact }: { value: T | ''; options: Option<T>[]; onChange: (value: T) => void; label: string; placeholder?: string; disabled?: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false)
+  const [place, setPlace] = useState<React.CSSProperties>({})
   const [active, setActive] = useState(0)
   const root = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLUListElement>(null)
@@ -18,14 +20,28 @@ export default function Select<T extends string>({ value, options, onChange, lab
   useEffect(() => {
     if (!open) return
     const close = (event: MouseEvent) => { if (!root.current?.contains(event.target as Node)) setOpen(false) }
+    // Scrolling anything but the list itself would leave it hanging in the wrong place.
+    const onScroll = (event: Event) => { if (!(event.target instanceof Node && list.current?.contains(event.target))) setOpen(false) }
     document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onScroll)
+    return () => { document.removeEventListener('mousedown', close); window.removeEventListener('scroll', onScroll, true); window.removeEventListener('resize', onScroll) }
   }, [open])
   useEffect(() => {
     if (open && keyboard.current) list.current?.children[active]?.scrollIntoView({ block: 'nearest' })
     keyboard.current = false
   }, [open, active])
-  const show = () => { keyboard.current = true; setActive(Math.max(0, options.findIndex((option) => option.value === value))); setOpen(true) }
+  const show = () => {
+    const rect = root.current?.getBoundingClientRect()
+    if (rect) {
+      const below = window.innerHeight - rect.bottom - 12
+      const up = below < 200 && rect.top > below
+      setPlace({ left: rect.left, minWidth: rect.width, maxHeight: Math.min(280, (up ? rect.top : window.innerHeight - rect.bottom) - 12), ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) })
+    }
+    keyboard.current = true
+    setActive(Math.max(0, options.findIndex((option) => option.value === value)))
+    setOpen(true)
+  }
   const choose = (index: number) => { const option = options[index]; if (option) onChange(option.value); setOpen(false) }
   const onKey = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape' || event.key === 'Tab') { setOpen(false); return }
@@ -42,7 +58,7 @@ export default function Select<T extends string>({ value, options, onChange, lab
       onClick={() => open ? setOpen(false) : show()} onKeyDown={onKey}>
       <span className={selected ? '' : 'placeholder'}>{selected?.label ?? placeholder}</span><ChevronDown size={16} />
     </button>
-    {open && <ul className="select-list" role="listbox" id={id} ref={list} aria-label={label}>
+    {open && <ul className="select-list" role="listbox" id={id} ref={list} aria-label={label} style={place}>
       {options.map((option, index) => <li key={option.value} role="option" aria-selected={option.value === value} className={cx(index === active && 'is-active', option.value === value && 'is-selected')}
         onMouseEnter={() => setActive(index)} onMouseDown={(event) => { event.preventDefault(); choose(index) }}>
         <span>{option.label}{option.hint && <small>{option.hint}</small>}</span>{option.value === value && <Check size={15} />}

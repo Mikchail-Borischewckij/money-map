@@ -54,7 +54,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   ]
 
   return <Section step={2} title="Доходы" done={done}
-    meta={plan.incomes.length > 0 && <span>Ожидается {money(total(expected(plan.incomes)))}</span>}>
+    total={plan.incomes.length > 0 && `Ожидается ${money(total(expected(plan.incomes)))}`}>
     <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns}
       rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
       defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Ожидается"

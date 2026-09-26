@@ -5,7 +5,7 @@ import { cx } from '@/lib/format'
 
 const format = (value: number) => new Intl.NumberFormat('ru-RU', { minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 }).format(value)
 
-// Amount in złoty with up to two decimals. Keeps the typed text while focused so "12," does not jump to "12".
+// Amount in PLN with up to two decimals. Keeps the typed text while focused so "12," does not jump to "12".
 export default function MoneyInput({ value, onChange, label, disabled, autoFocus }: { value: number; onChange: (value: number) => void; label: string; disabled?: boolean; autoFocus?: boolean }) {
   const [focused, setFocused] = useState(false)
   const [draft, setDraft] = useState('')
@@ -21,6 +21,6 @@ export default function MoneyInput({ value, onChange, label, disabled, autoFocus
         const amount = Number(raw.replace(',', '.') || 0)
         if (Number.isFinite(amount)) onChange(amount)
       }} />
-    <span>zł</span>
+    <span>PLN</span>
   </label>
 }

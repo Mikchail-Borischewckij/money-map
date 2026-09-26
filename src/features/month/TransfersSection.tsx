@@ -3,12 +3,12 @@
 import { ArrowRight } from 'lucide-react'
 import { DataTable, type Column } from '@/components/ui'
 import type { PlanSummary } from '@/lib/domain'
-import { amount, cx, money } from '@/lib/format'
+import { cx, money } from '@/lib/format'
 import Section from './Section'
 
 type Row = PlanSummary['accounts'][number]
 
-const signed = (value: number) => value === 0 ? '0' : `${value > 0 ? '+' : '−'} ${amount(Math.abs(value))}`
+const signed = (value: number) => value === 0 ? money(0) : `${value > 0 ? '+' : '−'} ${money(Math.abs(value))}`
 const spent = (account: Row) => account.payments + account.allocations
 const moved = (account: Row) => account.incoming - account.outgoing
 const sum = (rows: Row[], pick: (account: Row) => number) => rows.reduce((total, account) => total + pick(account), 0)
@@ -19,17 +19,17 @@ export default function TransfersSection({ step, summary, accountTag }: { step: 
   if (accounts.length === 0) return null
   const columns: Column<Row>[] = [
     { key: 'name', header: 'Счёт', sort: (account) => account.name, mobile: 'title', cell: (account) => accountTag(account.id) },
-    { key: 'available', header: 'Ожидается', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => amount(account.available), footer: (rows) => amount(sum(rows, (account) => account.available)) },
+    { key: 'available', header: 'Ожидается', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => money(account.available), footer: (rows) => money(sum(rows, (account) => account.available)) },
     { key: 'spent', header: 'К оплате', align: 'right', mobileLabel: true, sort: spent,
-      cell: (account) => <span className={cx(spent(account) > 0 && 'is-out')}>{spent(account) ? `− ${amount(spent(account))}` : '0'}</span>,
-      footer: (rows) => <span className="is-out">− {amount(sum(rows, spent))}</span> },
+      cell: (account) => <span className={cx(spent(account) > 0 && 'is-out')}>{spent(account) ? `− ${money(spent(account))}` : money(0)}</span>,
+      footer: (rows) => <span className="is-out">− {money(sum(rows, spent))}</span> },
     { key: 'moved', header: 'Перевод', align: 'right', mobileLabel: true, sort: moved,
       cell: (account) => <span className={cx(moved(account) > 0 ? 'is-in' : moved(account) < 0 && 'is-out')}>{signed(moved(account))}</span> },
     { key: 'remaining', header: 'Остаток', align: 'right', mobile: 'amount', sort: (account) => account.remaining,
-      cell: (account) => <strong className={cx(account.remaining < 0 && 'negative')}>{amount(account.remaining)}</strong>,
-      footer: (rows) => amount(sum(rows, (account) => account.remaining)) },
+      cell: (account) => <strong className={cx(account.remaining < 0 && 'negative')}>{money(account.remaining)}</strong>,
+      footer: (rows) => money(sum(rows, (account) => account.remaining)) },
   ]
-  return <Section step={step} title="Счета и переводы" id="transfers" meta={<span>в zł</span>}>
+  return <Section step={step} title="Счета и переводы" id="transfers">
     <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} search={(account) => account.name} />
     <h3 className="subhead">Что перевести</h3>
     {summary.transfers.length === 0 ? <p className="muted">Переводы не нужны.</p> : <ol className="transfer-list">

@@ -162,7 +162,7 @@
 .select.is-open .select-button svg { transform: rotate(180deg); }
 .select-button:disabled { opacity: .6; cursor: not-allowed; }
 .select-compact { width: 170px; }
-.select-list { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; min-width: 100%; max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-pop); }
+.select-list { position: fixed; z-index: 60; max-width: calc(100vw - 16px); max-height: 280px; overflow: auto; margin: 0; padding: 6px; list-style: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-pop); }
 .select-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .select-list li small { display: block; color: var(--muted); font-size: 12px; }
 .select-list li.is-active { background: var(--surface-2); }
@@ -382,7 +382,6 @@
 .table-toolbar-actions .select-compact { width: 180px; }
 .table-scroll { max-width: 100%; margin: 0; padding: 0 0 8px; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 .data-table thead th, .money-table thead th { height: 38px; color: var(--muted); font-size: 11px; letter-spacing: .4px; }
-.data-table tbody tr:hover, .money-table tbody tr:hover { background: var(--surface-2); }
 .data-table th, .data-table td, .money-table th, .money-table td { padding-top: 12px; padding-bottom: 12px; }
 .money-table .is-in { color: #11734b; }
 .money-table .is-out { color: var(--danger); }
@@ -506,3 +505,14 @@
 .data-table th, .data-table td { padding-left: 8px; padding-right: 8px; }
 .data-table .bank-logo-name { white-space: normal; }
 .data-table .col-check, .data-table thead .center { width: 1%; }
+
+/* Tabs and pickers */
+.segmented button.is-active { background: var(--primary-soft); color: var(--primary-ink); box-shadow: none; }
+.segmented-tabs button.is-active { background: var(--primary); color: #fff; }
+.table-toolbar.is-plain { justify-content: flex-end; padding: 0; border: 0; background: none; }
+.money-input span { font-size: 12px; }
+.section-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.section-meta > span + span::before { content: "·"; margin-right: 8px; }
+.is-in { color: #11734b; }
+.is-out { color: var(--danger); }
+@media (prefers-color-scheme: dark) { .is-in { color: #78d8ac; } }

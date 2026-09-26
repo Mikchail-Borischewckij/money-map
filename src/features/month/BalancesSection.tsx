@@ -14,7 +14,7 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
   const done = accounts.length > 0 && checked === accounts.length
   const sum = total(accounts.map((account) => ({ amount: account.openingBalance })))
   return <Section step={1} title="Остатки на счетах" done={done}
-    meta={accounts.length > 0 && (done ? <span>{money(sum)}</span> : <Badge tone="warn">Проверено {checked} из {accounts.length}</Badge>)}>
+    total={accounts.length > 0 && money(sum)} meta={accounts.length > 0 && !done && <Badge tone="warn">Проверено {checked} из {accounts.length}</Badge>}>
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}
     <div className="rows">
       {accounts.map((account) => <div className="row" key={account.id}>

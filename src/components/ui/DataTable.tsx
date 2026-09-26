@@ -229,7 +229,7 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const align = (column: Column<T>) => cx(column.align === 'right' && 'num', column.align === 'center' && 'center', column.className)
   const nothing = <p className="dt-nothing muted">Ничего не найдено.{filtered && <> <button type="button" className="link" onClick={() => { setFilters({}); setQuery('') }}>Сбросить фильтры</button></>}</p>
 
-  const toolbar = (search && !fixed) || actions ? <div className="table-toolbar">
+  const toolbar = (search && !fixed) || actions ? <div className={cx('table-toolbar', !(search && !fixed) && 'is-plain')}>
     {search && !fixed && <label className="table-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Поиск</span>
       <input value={query} placeholder="Поиск" onChange={(event) => { setQuery(event.target.value); setPage(1) }} />
     </label>}

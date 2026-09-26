@@ -41,7 +41,7 @@ export default function SettingsPage({ csrfToken, onChanged }: { csrfToken: stri
 
   return <div className="page">
     <header className="page-head"><h1>Настройки</h1></header>
-    <Segmented label="Раздел настроек" value={tab} options={tabs} onChange={(value) => { setTab(value); setMessage(''); setError('') }} />
+    <Segmented tabs label="Раздел настроек" value={tab} options={tabs} onChange={(value) => { setTab(value); setMessage(''); setError('') }} />
     {message && <p className="toast" role="status">{message}</p>}
     {error && <p className="toast toast-error" role="alert">{error}</p>}
     {tab === 'accounts' && <AccountsTab accounts={lists.accounts} csrfToken={csrfToken} run={run} />}

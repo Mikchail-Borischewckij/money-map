@@ -18,7 +18,7 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
   const planned = plan.payments.filter((payment) => payment.enabled)
   const unchecked = planned.filter((payment) => !payment.checked).length
   return <Section step={3} title="Платежи" done={planned.length > 0 && unchecked === 0}
-    meta={<span>Всего {money(total(planned))}{unchecked > 0 && ` · не проверено ${unchecked}`}</span>}>
+    total={planned.length > 0 && `Всего ${money(total(planned))}`} meta={unchecked > 0 && `не проверено ${unchecked}`}>
     <DataTable label="Платежи" rows={plan.payments} rowKey={(payment) => payment.id} rowClassName={paymentRowClass}
       columns={paymentColumns({ period: periodOfPlan(plan), readOnly, accountTag, accountName, onChange: change, onRemove: remove, onReset })}
       defaultSort={{ key: 'when', dir: 'asc' }}
