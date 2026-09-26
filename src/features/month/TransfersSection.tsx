@@ -43,7 +43,7 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
       ? [...(current.doneTransfers ?? []), { id: crypto.randomUUID(), fromAccountId: transfer.fromAccountId, toAccountId: transfer.toAccountId, amount: transfer.amount }]
       : (current.doneTransfers ?? []).filter((item) => item.id !== transfer.id),
   }))
-  return <Section step={step} title="Счета и переводы" id="transfers" done={!readOnly && ready && summary.transfers.length > 0 && pending === 0} meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, "Переведено")}>
+  return <Section step={step} title="Счета и переводы" id="transfers" done={!readOnly && ready && summary.transfers.length > 0 && pending === 0} meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, 'Переведено')}>
     <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} search={(account) => account.name} />
     <h3 className="subhead">Что перевести</h3>
     {!readOnly && !ready && summary.transfers.length > 0 && <p className="note">Отметить переводы можно после проверки остатков, доходов и платежей.</p>}
