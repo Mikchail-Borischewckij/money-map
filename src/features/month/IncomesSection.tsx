@@ -8,6 +8,7 @@ import { money } from '@/lib/format'
 import Amount from './Amount'
 import Attention from './Attention'
 import OneOffDialog from './OneOffDialog'
+import { progress } from './Progress'
 import Section from './Section'
 import { beforeBalances, dayInPlan, dayText, incomeToCheck, isDate, periodOfPlan, incomeStatuses, total, type UpdatePlan } from './utils'
 
@@ -22,6 +23,8 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   const expected = (items: Income[]) => items.filter((income) => income.enabled && income.status === 'expected')
   const period = periodOfPlan(plan)
   const isPast = (income: Income) => income.enabled && income.status === 'expected' && beforeBalances(period, income.expectedOn)
+  // Excluded incomes need no check, so they are not counted.
+  const toCheck = plan.incomes.filter((income) => income.enabled && income.status !== 'excluded')
   const unchecked = plan.incomes.filter(incomeToCheck).length
   const done = plan.incomes.length > 0 && unchecked === 0
   const locked = (income: Income) => readOnly || Boolean(income.checked)
@@ -60,7 +63,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   ]
 
   return <Section step={2} title="Доходы" done={done}
-    total={plan.incomes.length > 0 && `Ожидается ${money(total(expected(plan.incomes)))}`} meta={unchecked > 0 && `не проверено ${unchecked}`}>
+    total={plan.incomes.length > 0 && `Ожидается ${money(total(expected(plan.incomes)))}`} meta={progress(toCheck.length - unchecked, toCheck.length)}>
     <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns}
       rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
       defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Ожидается"

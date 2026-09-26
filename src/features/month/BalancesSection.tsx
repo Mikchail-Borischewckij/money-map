@@ -2,6 +2,7 @@ import { AccountBadge, Badge, Button, Checkbox, Empty } from '@/components/ui'
 import type { Account, Plan } from '@/lib/domain'
 import { money } from '@/lib/format'
 import Amount from './Amount'
+import { progress } from './Progress'
 import Section from './Section'
 import { total, type UpdatePlan } from './utils'
 
@@ -14,7 +15,7 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
   const done = accounts.length > 0 && checked === accounts.length
   const sum = total(accounts.map((account) => ({ amount: account.openingBalance })))
   return <Section step={1} title="Остатки на счетах" done={done}
-    total={accounts.length > 0 && money(sum)} meta={accounts.length > 0 && !done && <Badge tone="warn">Проверено {checked} из {accounts.length}</Badge>}>
+    total={accounts.length > 0 && money(sum)} meta={progress(checked, accounts.length)}>
     {accounts.length === 0 && <Empty>Счетов пока нет. <Button variant="ghost" size="sm" onClick={onOpenSettings}>Добавить в настройках</Button></Empty>}
     <div className="rows">
       {accounts.map((account) => <div className="row" key={account.id}>

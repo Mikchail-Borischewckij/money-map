@@ -6,6 +6,7 @@ import type { Account, Payment, Plan } from '@/lib/domain'
 import { money } from '@/lib/format'
 import OneOffDialog from './OneOffDialog'
 import { paymentColumns, paymentRowClass } from './paymentColumns'
+import { progress } from './Progress'
 import Section from './Section'
 import { dayInPlan, periodOfPlan, total, type UpdatePlan } from './utils'
 
@@ -18,7 +19,7 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
   const planned = plan.payments.filter((payment) => payment.enabled)
   const unchecked = planned.filter((payment) => !payment.checked).length
   return <Section step={3} title="Платежи" done={planned.length > 0 && unchecked === 0}
-    total={planned.length > 0 && `Всего ${money(total(planned))}`} meta={unchecked > 0 && `не проверено ${unchecked}`}>
+    total={planned.length > 0 && `Всего ${money(total(planned))}`} meta={progress(planned.length - unchecked, planned.length)}>
     <DataTable label="Платежи" rows={plan.payments} rowKey={(payment) => payment.id} rowClassName={paymentRowClass}
       columns={paymentColumns({ period: periodOfPlan(plan), readOnly, accountTag, accountName, onChange: change, onRemove: remove, onReset })}
       defaultSort={{ key: 'when', dir: 'asc' }}
