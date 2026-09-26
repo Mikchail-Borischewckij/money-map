@@ -1,6 +1,8 @@
-// A quiet mark that something in the row needs a look; the reason is in the tooltip.
-export default function Attention({ reasons }: { reasons: string[] }) {
-  if (reasons.length === 0) return null
-  const text = reasons.join('. ')
-  return <span className="attention" title={text} role="img" aria-label={text} />
+import { Badge } from '@/components/ui'
+
+export type Note = { label: string; reason: string }
+
+// Short badges for what in the row needs a look; the full reason is in the tooltip.
+export default function Attention({ notes }: { notes: Note[] }) {
+  return <>{notes.map((note) => <Badge key={note.label} tone="warn" title={note.reason}>{note.label}</Badge>)}</>
 }

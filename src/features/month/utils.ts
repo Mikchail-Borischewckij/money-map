@@ -11,7 +11,7 @@ export type MonthActions = {
 
 export const round = (value: number) => Math.round(value * 100) / 100
 export const total = (items: { amount: number }[]) => round(items.reduce((sum, item) => sum + item.amount, 0))
-const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+export const isDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
 export const dayText = (value: string) => isDate(value) ? `${Number(value.slice(8))}‑е` : ''
 
 export const periodOfPlan = (plan: Plan): Period => ({ month: plan.month, startDay: plan.startDay ?? 1, from: plan.balancesOn ?? null })
