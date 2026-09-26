@@ -1,3 +1,4 @@
+// `keepAmount`: what must stay on the account this month (a fee, a reserve); it counts like a payment of the account.
 // `sweepToAccountId`: a business account sends everything above its own payments and `keepAmount` to this account in one transfer.
 export type MoneyAccount = { id: string; name: string; bank?: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean; sweepToAccountId?: string | null; keepAmount?: number }
 export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean; checked?: boolean }
@@ -39,7 +40,7 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
     const expectedIncome = plan.incomes.filter((income) => income.enabled && income.status === 'expected' && income.accountId === account.id).reduce((sum, income) => sum + cents(income.amount), 0n)
     const payments = plan.payments.filter((payment) => payment.enabled && payment.accountId === account.id).reduce((sum, payment) => sum + cents(payment.amount), 0n)
     const allocations = plan.allocations.filter((allocation) => allocation.accountId === account.id).reduce((sum, allocation) => sum + cents(allocation.amount), 0n)
-    const keep = isBusiness(account) ? cents(account.keepAmount ?? 0) : 0n
+    const keep = cents(account.keepAmount ?? 0)
     return { account, available: opening + expectedIncome, expectedIncome, payments, allocations, keep, incoming: 0n, outgoing: 0n }
   })
   const byId = new Map(base.map((item) => [item.account.id, item]))
@@ -87,7 +88,7 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
       available: safeNumber(item.available), needed: safeNumber(needed),
       gap: safeNumber(needed > item.available ? needed - item.available : 0n), surplus: safeNumber(item.available > needed ? item.available - needed : 0n),
       incoming: safeNumber(item.incoming), outgoing: safeNumber(item.outgoing),
-      // What stays on the account after this period's payments, savings and transfers (a business reserve included).
+      // What stays on the account after this period's payments, savings and transfers (the amount to keep included).
       remaining: safeNumber(item.available + item.incoming - item.outgoing - item.payments - item.allocations),
     }
   })
@@ -107,7 +108,7 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
     totalAvailable: safeNumber(totalAvailable), totalIncome: safeNumber(totalIncome),
     totalPayments: safeNumber(totalPayments), totalLiving: safeNumber(totalLiving),
     totalSavings: safeNumber(totalSavings), totalOther: safeNumber(totalOther), totalKeep: safeNumber(totalKeep),
-    // What is left for living: everything after payments, savings and business reserves.
+    // What is left: everything after payments, savings and the amounts kept on accounts.
     freeAfterPlan: safeNumber(totalAvailable - totalPayments - totalLiving - totalSavings - totalOther - totalKeep),
     uncovered: safeNumber(targets.reduce((sum, target) => sum + target.remaining, 0n)),
   }

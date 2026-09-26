@@ -17,11 +17,19 @@ export async function PUT(request: Request, context: Context) {
   const value = await accountFields(session, parsed.data, id)
   if (!value) return Response.json({ error: 'Invalid account' }, { status: 400, headers: privateHeaders })
   const updated = await db().begin(async (tx) => {
+    const before = await tx`SELECT keep_amount FROM accounts WHERE id = ${id} AND household_id = ${session.householdId}`
     const rows = await tx`UPDATE accounts SET name = ${value.name}, bank = ${value.bank}, type = ${value.kind}, can_fund_transfers = ${value.canFundTransfers},
       transfer_priority = ${value.priority}, sweep_to_account_id = ${value.sweepToAccountId}, keep_amount = ${value.keepAmount}, version = version + 1, updated_at = now()
       WHERE id = ${id} AND household_id = ${session.householdId} AND version = ${value.version} AND is_archived = false RETURNING *`
     if (rows[0]) await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'Account', ${id}, 'update', ${value.version}, ${value.version + 1})`
+    // A new amount to keep reaches the open month unless the month already has its own amount for this account.
+    if (rows[0] && before[0] && Number(before[0].keep_amount) !== value.keepAmount) {
+      const changed = await tx`UPDATE account_balances b SET keep_amount_snapshot = ${value.keepAmount}
+        FROM monthly_plans p WHERE b.monthly_plan_id = p.id AND p.household_id = ${session.householdId} AND p.status = 'Draft'
+        AND b.account_id = ${id} AND b.keep_amount_snapshot = ${before[0].keep_amount} RETURNING p.id`
+      if (changed[0]) await tx`UPDATE monthly_plans SET version = version + 1, updated_by = ${session.userId}, updated_at = now() WHERE id = ${changed[0].id}`
+    }
     return rows[0]
   })
   if (updated) return Response.json(updated, { headers: privateHeaders })

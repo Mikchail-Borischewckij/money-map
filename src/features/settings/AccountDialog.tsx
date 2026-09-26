@@ -8,6 +8,7 @@ import { kindOptions, type AccountKind, type AccountRow } from './types'
 export type AccountValue = { name: string; bank: BankId; kind: AccountKind; canFundTransfers: boolean; sweepToAccountId: string | null; keepAmount: number }
 
 // A business account pays its own bills and sends the rest to one personal account in a single transfer.
+// Any account can keep an amount untouched each month (a fee, a reserve); the month starts from it and can change it.
 export default function AccountDialog({ account, accounts, onClose, onSave }: { account: AccountRow | null; accounts: AccountRow[]; onClose: () => void; onSave: (value: AccountValue) => void }) {
   const [name, setName] = useState(account?.name ?? '')
   const [bank, setBank] = useState<BankId | ''>(account && account.bank !== 'cash' ? account.bank ?? inferBank(account.name) : '')
@@ -22,7 +23,7 @@ export default function AccountDialog({ account, accounts, onClose, onSave }: { 
   const valid = Boolean(name.trim() && (cash || bank)) && (!business || Boolean(sweepTo))
   const save = () => {
     if (!valid) return
-    onSave({ name: name.trim(), bank: cash ? 'cash' : bank as BankId, kind, canFundTransfers: business || cash ? false : canFundTransfers, sweepToAccountId: business ? sweepTo : null, keepAmount: business ? keep : 0 })
+    onSave({ name: name.trim(), bank: cash ? 'cash' : bank as BankId, kind, canFundTransfers: business || cash ? false : canFundTransfers, sweepToAccountId: business ? sweepTo : null, keepAmount: keep })
   }
   return <Dialog title={account ? 'Счёт' : 'Новый счёт'} onClose={onClose} actions={<><Button onClick={onClose}>Отмена</Button><Button variant="primary" disabled={!valid} onClick={save}>Сохранить</Button></>}>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); save() }}>
@@ -32,9 +33,13 @@ export default function AccountDialog({ account, accounts, onClose, onSave }: { 
       {business ? <>
         <Field label="Остаток переводить на"><Select label="Остаток переводить на" value={sweepTo} placeholder="Выберите счёт" options={targets.map((item) => ({ value: item.id, label: item.name }))} onChange={setSweepTo} /></Field>
         <Field label="Оставлять на счёте"><MoneyInput label="Оставлять на счёте" value={keep} onChange={setKeep} /></Field>
-        <p className="note field-wide">Добавьте налоги и бухгалтерию в платежи этого счёта. Остаток сверх них и резерва переводится на выбранный счёт.</p>
+        <p className="note field-wide">Добавьте налоги и бухгалтерию в платежи этого счёта. Остаток сверх них и того, что оставляется, переводится на выбранный счёт.</p>
         {targets.length === 0 && <p className="form-error">Сначала добавьте личный счёт.</p>}
-      </> : !cash && <div className="field field-wide"><Switch checked={canFundTransfers} onChange={setCanFundTransfers}>Можно брать деньги для переводов</Switch></div>}
+      </> : <>
+        <Field label="Оставлять на счёте"><MoneyInput label="Оставлять на счёте" value={keep} onChange={setKeep} /></Field>
+        {!cash && <div className="field field-wide"><Switch checked={canFundTransfers} onChange={setCanFundTransfers}>Можно брать деньги для переводов</Switch></div>}
+        <p className="note field-wide">Сумма, которая остаётся на счёте каждый месяц: на комиссию или про запас. В самом месяце её можно поменять.</p>
+      </>}
       <button type="submit" hidden />
     </form>
   </Dialog>

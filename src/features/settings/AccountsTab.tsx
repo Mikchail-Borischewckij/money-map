@@ -55,12 +55,10 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
   }
   // How the account takes part in transfers.
   const transfers = (account: AccountRow) => {
-    if (account.kind === 'business') {
-      const keep = Number(account.keep_amount ?? 0)
-      return <span className="cell-flow">{account.sweep_to_account_id ? <>Остаток <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Остаток не переводится'}{keep > 0 && <span className="muted">запас {money(keep / 100)}</span>}</span>
-    }
-    if (account.kind === 'cash') return <span className="muted">Только пополнение</span>
-    return account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>
+    const keep = Number(account.keep_amount ?? 0)
+    const kept = keep > 0 && <span className="muted">оставлять {money(keep / 100)}</span>
+    if (account.kind === 'business') return <span className="cell-flow">{account.sweep_to_account_id ? <>Остаток <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Остаток не переводится'}{kept}</span>
+    return <span className="cell-flow">{account.kind === 'cash' ? <span className="muted">Только пополнение</span> : account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>}{kept}</span>
   }
   // An archived account comes back last in the transfer order and appears in the open month again.
   const restore = (account: AccountRow) => run(() => send(`/api/accounts/${account.id}/restore`, 'POST', csrfToken, { expectedVersion: account.version }), 'Счёт снова в работе. Он появился в открытом месяце.',

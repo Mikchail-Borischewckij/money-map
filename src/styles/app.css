@@ -522,3 +522,7 @@
 .transfer-list li.is-done .transfer-route, .transfer-list li.is-done .amount { color: var(--muted); }
 .transfer-list li.is-done::before { background: var(--primary); color: #fff; }
 .transfer-check { display: grid; place-items: center; }
+.keep-field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.keep-field .money-input { width: 120px; }
+@media (max-width: 640px) { .keep-field { order: 2; flex-basis: 100%; justify-content: space-between; } .keep-field .money-input { width: 140px; } }
+.keep-field .money-input input { color: var(--text); }
