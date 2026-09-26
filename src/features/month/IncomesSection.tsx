@@ -56,7 +56,8 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
       cell: (income) => {
         const excluded = statusOf(income) === 'excluded'
         if (readOnly) return !excluded && income.checked ? <Check size={16} className="checked-mark" aria-label="Проверено" /> : null
-        const status = (value: Income['status'], label: string) => ({ label, onSelect: () => change(income.id, { status: value, enabled: true, ...(value === 'included' ? { amountPending: false } : {}) }) })
+        // The tick covers the status as well as the amount, so changing one takes it off, like editing the other.
+        const status = (value: Income['status'], label: string) => ({ label, onSelect: () => change(income.id, { status: value, enabled: true, checked: false, ...(value === 'included' ? { amountPending: false } : {}) }) })
         const menu: MenuItem[] = [
           ...incomeStatuses.filter((item) => item.value !== statusOf(income)).map((item) => status(item.value, item.label)),
           ...(income.recurringIncomeId ? [] : [{ label: 'Удалить', danger: true, onSelect: () => remove(income.id) }]),
