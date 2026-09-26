@@ -516,8 +516,6 @@
 .is-in { color: #11734b; }
 .is-out { color: var(--danger); }
 @media (prefers-color-scheme: dark) { .is-in { color: #78d8ac; } }
-.table-search-clear { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-3); color: var(--text-2); cursor: pointer; }
-.table-search-clear:hover { background: var(--border-strong); }
-.table-search input:focus-visible, .table-search-clear:focus-visible { box-shadow: none; }
+.table-search input:focus-visible { box-shadow: none; }
 .dt-filter-menu .text-input:focus { border-color: var(--border-strong); background: var(--surface); box-shadow: none; }
 @media (max-width: 640px) { .table-toolbar .btn-label { display: none; } .table-toolbar .btn:has(.btn-label) { width: 36px; padding: 0; } }

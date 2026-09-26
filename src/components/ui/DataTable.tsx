@@ -233,7 +233,6 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const toolbar = (search && !fixed) || actions || filtered ? <div className={cx('table-toolbar', !(search && !fixed) && 'is-plain')}>
     {search && !fixed && <label className="table-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Поиск</span>
       <input value={query} placeholder="Поиск" onChange={(event) => { setQuery(event.target.value); setPage(1) }} />
-      {query && <button type="button" className="table-search-clear" aria-label="Очистить поиск" onClick={() => { setQuery(''); setPage(1) }}><X size={14} /></button>}
     </label>}
     {(filtered || actions) && <div className="table-toolbar-actions">
       {filtered && <Button size="sm" icon={<X size={16} />} aria-label="Сбросить фильтры" onClick={reset}><span className="btn-label">Сбросить</span></Button>}
