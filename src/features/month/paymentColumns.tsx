@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
 import { Badge, Button, Checkbox, RowMenu, Stepper, type Column, type MenuItem } from '@/components/ui'
 import { amountToCheck, type Payment } from '@/lib/domain'
-import { money } from '@/lib/format'
+import { amount as plainAmount } from '@/lib/format'
 import { countWeekdaysInPeriod, type Period } from '@/lib/period'
 import { weekdayLabel } from '@/lib/schedule'
 import Amount from './Amount'
@@ -19,8 +19,8 @@ const whenOf = (payment: Payment) => weeklyOf(payment) && payment.weekdays ? wee
 export const paymentRowClass = (payment: Payment) => payment.enabled ? undefined : 'is-muted'
 
 export function paymentColumns({ period, readOnly, accountTag, accountName, onChange, onRemove, onReset }: Options): Column<Payment>[] {
-  // A checked amount is locked; uncheck it to change the amount.
-  const locked = (payment: Payment) => readOnly || Boolean(payment.checked) || !payment.enabled
+  // Nothing is locked: changing an amount takes the tick off the row, so "Проверено N из M" stays true.
+  const locked = (payment: Payment) => readOnly || !payment.enabled
   const past = (payment: Payment) => payment.enabled && !weeklyOf(payment) && beforeBalances(period, payment.due)
   return [
     { key: 'name', header: 'Платёж', sort: (payment) => payment.name, mobile: 'title', cell: (payment) => <span className="cell-name">
@@ -34,34 +34,36 @@ export function paymentColumns({ period, readOnly, accountTag, accountName, onCh
     { key: 'account', header: 'Счёт', sort: (payment) => accountName(payment.accountId), filter: { type: 'list', value: (payment) => payment.accountId, label: accountName }, cell: (payment) => accountTag(payment.accountId) },
     { key: 'when', header: 'Когда', sort: (payment) => isDate(payment.due) ? payment.due : `9${payment.due}`, cell: (payment) => <span className="muted">{whenOf(payment)}</span> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (payment) => payment.amount,
-      footer: (rows) => money(total(rows.filter((payment) => payment.enabled))),
+      footer: (rows) => plainAmount(total(rows.filter((payment) => payment.enabled))),
       cell: (payment) => {
-        if (!weeklyOf(payment)) return <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={locked(payment)} onChange={(amount) => onChange(payment.id, { amount, amountPending: false })} />
-        const calendar = payment.weekdays ? countWeekdaysInPeriod(period, payment.weekdays) : null
-        const setQuantity = (quantity: number) => onChange(payment.id, { quantity, amount: round(payment.unitPrice! * quantity) })
+        if (!weeklyOf(payment)) return <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={locked(payment)} plain
+          onChange={(value) => onChange(payment.id, { amount: value, amountPending: false, checked: false })} />
+        const setQuantity = (quantity: number) => onChange(payment.id, { quantity, amount: round(payment.unitPrice! * quantity), checked: false })
         return <div className="units units-cell">
           {locked(payment) ? <span>{payment.quantity} раз</span> : <Stepper label={`Сколько раз: ${payment.name}`} value={payment.quantity!} onChange={setQuantity} />}
-          <span className="units-price">× {money(payment.unitPrice!)}</span>
-          {!locked(payment) && calendar !== null && calendar !== payment.quantity && <button type="button" className="link" onClick={() => setQuantity(calendar)}>по календарю {calendar}</button>}
-          <strong className="amount">{money(payment.amount)}</strong>
+          <span className="units-price">× {plainAmount(payment.unitPrice!)}</span>
+          <strong className="amount">{plainAmount(payment.amount)}</strong>
         </div>
       } },
-    { key: 'checked', header: 'Проверено', align: 'center', mobile: 'end',
+    { key: 'check', header: 'Проверено', mobile: 'end', className: 'actions',
       filter: { type: 'list', value: (payment) => !payment.enabled ? 'Не платим' : payment.checked ? 'Проверено' : 'Не проверено' },
-      cell: (payment) => !payment.enabled ? null : readOnly
-        ? payment.checked && <Check size={16} className="checked-mark" aria-label="Проверено" />
-        : <Checkbox checked={Boolean(payment.checked)} label={`Проверено: ${payment.name}`} onChange={(checked) => onChange(payment.id, checked ? { checked, amountPending: false } : { checked })} /> },
-    { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (payment) => {
-      if (readOnly) return null
-      if (!payment.enabled) return <Button size="sm" onClick={() => onChange(payment.id, { enabled: true })}>Вернуть</Button>
-      // "Уже оплачен" used to be a second item doing exactly what "Не платить в этом месяце" does; one is enough.
-      const menu: MenuItem[] = [
-        { label: 'Не платить в этом месяце', onSelect: () => onChange(payment.id, { enabled: false }) },
-        ...(payment.recurringPaymentId
-          ? payment.checked ? [] : [{ label: 'Вернуть как в настройках', onSelect: () => onReset(payment.id) }]
-          : [{ label: 'Удалить', danger: true, onSelect: () => onRemove(payment.id) }]),
-      ]
-      return <RowMenu label={`Действия: ${payment.name}`} items={menu} />
-    } },
+      cell: (payment) => {
+        if (readOnly) return payment.checked && payment.enabled ? <Check size={16} className="checked-mark" aria-label="Проверено" /> : null
+        if (!payment.enabled) return <Button size="sm" onClick={() => onChange(payment.id, { enabled: true })}>Вернуть</Button>
+        const calendar = weeklyOf(payment) && payment.weekdays ? countWeekdaysInPeriod(period, payment.weekdays) : null
+        const menu: MenuItem[] = [
+          ...(calendar !== null && calendar !== payment.quantity
+            ? [{ label: `Поставить по календарю: ${calendar}`, onSelect: () => onChange(payment.id, { quantity: calendar, amount: round(payment.unitPrice! * calendar), checked: false }) }]
+            : []),
+          { label: 'Не платить в этом месяце', onSelect: () => onChange(payment.id, { enabled: false }) },
+          ...(payment.recurringPaymentId
+            ? payment.checked ? [] : [{ label: 'Вернуть как в настройках', onSelect: () => onReset(payment.id) }]
+            : [{ label: 'Удалить', danger: true, onSelect: () => onRemove(payment.id) }]),
+        ]
+        return <div className="cell-actions">
+          <Checkbox checked={Boolean(payment.checked)} label={`Проверено: ${payment.name}`} onChange={(checked) => onChange(payment.id, checked ? { checked, amountPending: false } : { checked })} />
+          <RowMenu label={`Действия: ${payment.name}`} items={menu} />
+        </div>
+      } },
   ]
 }

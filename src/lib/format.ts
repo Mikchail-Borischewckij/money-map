@@ -1,5 +1,8 @@
 // "13 000 PLN", "912,50 PLN": whole amounts without ",00", like the amount inputs.
-export const money = (amount: number) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'PLN', currencyDisplay: 'code', minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 }).format(amount)
+// Use `money` where the amount stands alone — a total, a heading, a sentence. Inside a table use `amount`:
+// the column header and the total line already say PLN, and repeating it on every row is noise.
+export const money = (value: number) => new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'PLN', currencyDisplay: 'code', minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 }).format(value)
+export const amount = (value: number) => new Intl.NumberFormat('ru-RU', { minimumFractionDigits: Number.isInteger(value) ? 0 : 2, maximumFractionDigits: 2 }).format(value)
 
 export function monthName(value: string, withYear = true) {
   const [year, month] = value.split('-').map(Number)

@@ -7,7 +7,7 @@ import type { CategoryNames } from '@/lib/domain'
 import { money, monthName, periodTitle } from '@/lib/format'
 import BalancesDate from './BalancesDate'
 import MonthView from './MonthView'
-import { incomeToCheck, paymentToCheck } from './utils'
+import { incomeToCheck, paymentToCheck, savingsOf } from './utils'
 
 export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: CategoryNames; onOpenSettings: () => void }) {
   const [confirmClose, setConfirmClose] = useState(false)
@@ -15,27 +15,37 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
   const liveAccounts = plan.accounts.filter((account) => !account.isArchived)
   const unchecked = liveAccounts.filter((account) => !account.balanceConfirmed).length
   const incomesToCheck = plan.incomes.filter(incomeToCheck).length
-  // Every balance, income and payment must be checked and every transfer made before the month can be closed.
   const paymentsToCheck = plan.payments.filter(paymentToCheck).length
   const transfersToMake = summary.transfers.filter((transfer) => !transfer.done).length
-  const closeBlocker = liveAccounts.length === 0 ? 'Добавьте счёт в настройках.'
-    : unchecked > 0 ? `Проверьте остатки: осталось ${unchecked}.`
-    : incomesToCheck > 0 ? `Проверьте доходы: осталось ${incomesToCheck}.`
-    : paymentsToCheck > 0 ? `Проверьте платежи: осталось ${paymentsToCheck}.`
-    : transfersToMake > 0 ? `Отметьте переводы: осталось ${transfersToMake}.`
-    : month.dirty || month.saveState === 'saving' ? 'Сохраняем изменения…' : ''
-  const saveText = month.saveState === 'conflict' ? 'Конфликт' : month.saveState === 'error' ? 'Не сохранено' : month.saveState === 'saving' || month.dirty ? 'Сохраняем…' : 'Сохранено'
+  const transfersStep = Boolean(savingsOf(plan)) && liveAccounts.length > 0 ? 5 : 4
+  // Every balance, income and payment must be checked and every transfer made before the month can be closed.
+  // All of it at once, each line a link to its step: fixing one used to only reveal the next.
+  const blockers: { text: string; step?: number }[] = [
+    ...(liveAccounts.length === 0 ? [{ text: 'Добавьте счёт в настройках' }] : []),
+    ...(unchecked > 0 ? [{ text: `Проверьте, сколько на счетах: осталось ${unchecked}`, step: 1 }] : []),
+    ...(incomesToCheck > 0 ? [{ text: `Проверьте доходы: осталось ${incomesToCheck}`, step: 2 }] : []),
+    ...(paymentsToCheck > 0 ? [{ text: `Проверьте платежи: осталось ${paymentsToCheck}`, step: 3 }] : []),
+    ...(transfersToMake > 0 ? [{ text: `Отметьте переводы: осталось ${transfersToMake}`, step: transfersStep }] : []),
+  ]
+  const saving = month.dirty || month.saveState === 'saving'
+  const failed = month.saveState === 'conflict' || month.saveState === 'error'
+  const saveText = month.saveState === 'conflict' ? 'Конфликт' : month.saveState === 'error' ? 'Не сохранено' : saving ? 'Сохраняем…' : 'Сохранено'
   const actions = { onResetPayment: (id: string) => void month.reset('payments', id), onResetIncome: (id: string) => void month.reset('incomes', id), onOpenSettings }
 
   const footer = open
-    ? <div className="card close-card">
-      <Button variant="primary" className="btn-block" disabled={Boolean(closeBlocker)} onClick={() => setConfirmClose(true)}>Закрыть месяц</Button>
-      {closeBlocker && <p className="muted">{closeBlocker}</p>}
+    ? (goToStep: (step: number) => void) => <div className="card close-card">
+      {blockers.length > 0 && <ul className="close-todo">
+        {blockers.map((blocker) => <li key={blocker.text}>
+          {blocker.step ? <button type="button" className="link" onClick={() => goToStep(blocker.step!)}>{blocker.text}</button> : blocker.text}
+        </li>)}
+      </ul>}
+      <Button variant="primary" className="btn-block" disabled={blockers.length > 0 || saving} onClick={() => setConfirmClose(true)}>Закрыть месяц</Button>
+      {blockers.length === 0 && saving && <p className="muted">Сохраняем изменения…</p>}
     </div>
-    : nextMonth && <div className="card close-card">
+    : nextMonth ? () => <div className="card close-card">
       <p className="muted">Месяц можно открыть снова, пока следующий не начат.</p>
       <Button className="btn-block" onClick={() => void month.reopenMonth()}>Открыть снова</Button>
-    </div>
+    </div> : undefined
 
   return <div className="page">
     {!open && nextMonth && <div className="card next-month">
@@ -46,7 +56,7 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
       <div className="page-title">
         <h1>{periodTitle(plan.month, plan.startDay)}</h1>
         <Badge tone={open ? 'blue' : 'neutral'}>{open ? 'Открыт' : 'Закрыт'}</Badge>
-        {open && <span className="save-state" aria-live="polite">{saveText}</span>}
+        {open && <span className={failed ? 'save-state is-failed' : 'save-state'} aria-live="polite">{saveText}</span>}
       </div>
       {liveAccounts.length > 0 && <BalancesDate plan={plan} readOnly={!open} update={month.update} />}
     </header>

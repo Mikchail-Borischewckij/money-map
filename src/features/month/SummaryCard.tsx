@@ -9,7 +9,7 @@ export default function SummaryCard({ summary }: { summary: PlanSummary }) {
   const short = summary.freeAfterPlan < 0
   return <section className="card summary" aria-label="Итог">
     <div className={cx('summary-hero', short && 'is-short')}>
-      <span>{short ? 'Не хватает' : 'Остаётся на жизнь'}{summary.isPreliminary && <Badge tone="warn">Предварительно</Badge>}</span>
+      <span>{short ? 'Не хватает' : 'Остаётся на жизнь'}{summary.isPreliminary && <Badge>Предварительно</Badge>}</span>
       <strong>{money(Math.abs(summary.freeAfterPlan))}</strong>
     </div>
     <dl className="summary-lines">

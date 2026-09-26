@@ -57,7 +57,7 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
 
   const columns: Column<Template>[] = [
     { key: 'name', header: 'Название', sort: (item) => item.name, mobile: 'title', cell: (item) => <span className="cell-name">
-      <span className="cell-text">{item.name}</span>{lastMonth(item) && <Badge tone="warn">Последний месяц</Badge>}{item.amount_varies && <Badge>Сумма меняется</Badge>}
+      <span className="cell-text">{item.name}</span>{lastMonth(item) && <Badge>Последний месяц</Badge>}{item.amount_varies && <Badge>Сумма меняется</Badge>}
     </span> },
     { key: 'when', header: 'Когда', sort: (item) => item.day ?? (item.schedule === 'weekly' ? 0 : 99), cell: scheduleText },
     { key: 'account', header: 'Счёт', sort: (item) => accountName(item.account_id), filter: { type: 'list', value: (item) => item.account_id, label: accountName }, cell: account },

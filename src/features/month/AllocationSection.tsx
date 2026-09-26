@@ -1,12 +1,16 @@
 import { Plus } from 'lucide-react'
 import { Button, Select } from '@/components/ui'
 import type { Account, Allocation, Plan } from '@/lib/domain'
+import { money } from '@/lib/format'
 import Amount from './Amount'
 import Section from './Section'
 import { savingsOf, type UpdatePlan } from './utils'
 
 // Optional: most months nothing is set aside. Whatever is left after payments and savings is the money for living.
-export default function AllocationSection({ plan, step, readOnly, update, accounts, accountName }: { plan: Plan; step: number; readOnly: boolean; update: UpdatePlan; accounts: Account[]; accountName: (id: string) => string }) {
+export default function AllocationSection({ plan, step, readOnly, update, accounts, accountName, open, onToggle }: {
+  plan: Plan; step: number; readOnly: boolean; update: UpdatePlan; accounts: Account[]; accountName: (id: string) => string
+  open: boolean; onToggle: () => void
+}) {
   const value = savingsOf(plan)
   if (accounts.length === 0 || (!value && readOnly)) return null
   if (!value) return <Button variant="ghost" className="add-saving" icon={<Plus size={16} />} onClick={() => update((current) => {
@@ -15,7 +19,8 @@ export default function AllocationSection({ plan, step, readOnly, update, accoun
   })}>Отложить</Button>
   const set = (patch: Partial<Allocation>) => update((current) => ({ ...current, allocations: current.allocations.map((allocation) => allocation.id === value.id ? { ...allocation, ...patch } : allocation) }))
   const remove = () => update((current) => ({ ...current, allocations: current.allocations.filter((allocation) => allocation.id !== value.id) }))
-  return <Section step={step} title="Отложить" action={!readOnly && <Button size="sm" variant="ghost" onClick={remove}>Не откладывать</Button>}>
+  return <Section step={step} title="Отложить" open={open} onToggle={onToggle} total={money(value.amount)}
+    action={!readOnly && <Button size="sm" variant="ghost" onClick={remove}>Не откладывать</Button>}>
     <div className="rows">
       <div className="row">
         <div className="row-main"><strong>{readOnly ? accountName(value.accountId) : 'На счёт'}</strong></div>

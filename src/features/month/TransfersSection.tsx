@@ -3,14 +3,14 @@
 import { ArrowRight, Check } from 'lucide-react'
 import { Badge, Checkbox, DataTable, type Column } from '@/components/ui'
 import type { PlanSummary, Transfer } from '@/lib/domain'
-import { cx, money } from '@/lib/format'
+import { amount, cx, money } from '@/lib/format'
 import { progress } from './Progress'
 import Section from './Section'
 import type { UpdatePlan } from './utils'
 
 type Row = PlanSummary['accounts'][number]
 
-const signed = (value: number) => value === 0 ? money(0) : `${value > 0 ? '+' : '−'} ${money(Math.abs(value))}`
+const signed = (value: number) => value === 0 ? amount(0) : `${value > 0 ? '+' : '−'} ${amount(Math.abs(value))}`
 const spent = (account: Row) => account.payments + account.allocations
 const moved = (account: Row) => account.incoming - account.outgoing
 const sum = (rows: Row[], pick: (account: Row) => number) => rows.reduce((total, account) => total + pick(account), 0)
@@ -18,21 +18,23 @@ const sum = (rows: Row[], pick: (account: Row) => number) => rows.reduce((total,
 // Per account: what it has, what its payments need, how much to move in (+) or out (−) and what stays; then the transfers to make, in order.
 // A transfer is ticked once made, and only after balances, incomes and payments are all checked. A made transfer keeps its
 // amount; if more is needed later, a new transfer for the rest appears below it ("доперевести").
-export default function TransfersSection({ step, summary, accountTag, readOnly, ready, update }: {
-  step: number; summary: PlanSummary; accountTag: (id: string) => React.ReactNode; readOnly: boolean; ready: boolean; update: UpdatePlan
+export default function TransfersSection({ step, summary, accountTag, readOnly, ready, update, open, onToggle, done }: {
+  step: number; summary: PlanSummary; accountTag: (id: string) => React.ReactNode; readOnly: boolean; ready: boolean
+  update: UpdatePlan; open: boolean; onToggle: () => void; done: boolean
 }) {
   const accounts = summary.accounts.filter((account) => !account.isArchived || account.available || account.needed || account.incoming || account.outgoing)
   if (accounts.length === 0) return null
+  // No colour on ordinary money moving about: the sign already says which way it goes. Red is kept for the one
+  // thing that is actually wrong — an account that ends the month short.
   const columns: Column<Row>[] = [
     { key: 'name', header: 'Счёт', sort: (account) => account.name, mobile: 'title', cell: (account) => accountTag(account.id) },
-    { key: 'available', header: 'Будет на счёте', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => money(account.available), footer: (rows) => money(sum(rows, (account) => account.available)) },
+    { key: 'available', header: 'Будет на счёте', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => amount(account.available), footer: (rows) => money(sum(rows, (account) => account.available)) },
     { key: 'spent', header: 'К оплате', align: 'right', mobileLabel: true, sort: spent,
-      cell: (account) => <span className={cx(spent(account) > 0 && 'is-out')}>{spent(account) ? `− ${money(spent(account))}` : money(0)}</span>,
-      footer: (rows) => <span className="is-out">− {money(sum(rows, spent))}</span> },
-    { key: 'moved', header: 'Перевод', align: 'right', mobileLabel: true, sort: moved,
-      cell: (account) => <span className={cx(moved(account) > 0 ? 'is-in' : moved(account) < 0 && 'is-out')}>{signed(moved(account))}</span> },
+      cell: (account) => spent(account) ? `− ${amount(spent(account))}` : amount(0),
+      footer: (rows) => `− ${money(sum(rows, spent))}` },
+    { key: 'moved', header: 'Перевод', align: 'right', mobileLabel: true, sort: moved, cell: (account) => signed(moved(account)) },
     { key: 'remaining', header: 'Останется', align: 'right', mobile: 'amount', sort: (account) => account.remaining,
-      cell: (account) => <strong className={cx(account.remaining < 0 && 'negative')}>{money(account.remaining)}</strong>,
+      cell: (account) => <strong className={cx(account.remaining < 0 && 'negative')}>{amount(account.remaining)}</strong>,
       footer: (rows) => money(sum(rows, (account) => account.remaining)) },
   ]
   const pending = summary.transfers.filter((transfer) => !transfer.done).length
@@ -43,7 +45,9 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
       ? [...(current.doneTransfers ?? []), { id: crypto.randomUUID(), fromAccountId: transfer.fromAccountId, toAccountId: transfer.toAccountId, amount: transfer.amount }]
       : (current.doneTransfers ?? []).filter((item) => item.id !== transfer.id),
   }))
-  return <Section step={step} title="Счета и переводы" id="transfers" done={!readOnly && ready && summary.transfers.length > 0 && pending === 0} meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, 'Переведено')}>
+  return <Section step={step} title="Счета и переводы" open={open} onToggle={onToggle} done={done}
+    total={pending > 0 && `Перевести ${money(summary.transfers.filter((transfer) => !transfer.done).reduce((sum, transfer) => sum + transfer.amount, 0))}`}
+    meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, 'Переведено')}>
     <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} search={(account) => account.name} />
     <h3 className="subhead">Что перевести</h3>
     {!readOnly && !ready && summary.transfers.length > 0 && <p className="note">Отметить переводы можно после проверки остатков, доходов и платежей.</p>}

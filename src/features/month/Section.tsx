@@ -1,24 +1,25 @@
-"use client"
-
-import { useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
 import { cx } from '@/lib/format'
 
-// A step of the month. A finished step (`done`) folds into its header line until opened; the owner's choice wins once made.
-// `total` is shown in the header only while folded: an open section has its own total row.
-export default function Section({ step, title, meta, total, action, children, id, done = false }: { step: number; title: string; meta?: React.ReactNode; total?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode; id?: string; done?: boolean }) {
-  const [opened, setOpened] = useState<boolean | null>(null)
-  const folded = !(opened ?? !done)
-  const note = [folded && total, meta].filter(Boolean)
-  const heading = <><span className={cx('step', done && 'is-done')}>{done ? <Check size={15} strokeWidth={3} /> : step}</span>
-    <div className="section-title"><h2 id={`section-${step}`}>{title}</h2>{note.length > 0 && <div className="section-meta">{note.map((item, index) => <span key={index}>{item}</span>)}</div>}</div></>
-  return <section className={cx('card section', folded && 'is-folded')} id={id} aria-labelledby={`section-${step}`}>
+// A step of the month. Which step is open is decided by MonthView, not here: one step at a time, so the screen
+// asks for one thing. A folded step keeps its total and its progress on the header line.
+export default function Section({ step, title, meta, total, action, children, open, onToggle, done = false }: {
+  step: number; title: string; meta?: React.ReactNode; total?: React.ReactNode; action?: React.ReactNode
+  children: React.ReactNode; open: boolean; onToggle: () => void; done?: boolean
+}) {
+  const note = [!open && total, meta].filter(Boolean)
+  return <section className={cx('card section', !open && 'is-folded')} id={`step-${step}`} aria-labelledby={`section-${step}`}>
     <header className="section-head">
-      {done || opened !== null
-        ? <button type="button" className="section-toggle" aria-expanded={!folded} onClick={() => setOpened(folded)}>{heading}<ChevronDown size={18} className="section-chevron" /></button>
-        : heading}
-      {!folded && action}
+      <button type="button" className="section-toggle" aria-expanded={open} aria-controls={`body-${step}`} onClick={onToggle}>
+        <span className={cx('step', done && 'is-done')}>{done ? <Check size={15} strokeWidth={3} /> : step}</span>
+        <div className="section-title">
+          <h2 id={`section-${step}`}>{title}</h2>
+          {note.length > 0 && <div className="section-meta">{note.map((item, index) => <span key={index}>{item}</span>)}</div>}
+        </div>
+        <ChevronDown size={18} className="section-chevron" />
+      </button>
+      {open && action}
     </header>
-    {!folded && children}
+    {open && <div id={`body-${step}`}>{children}</div>}
   </section>
 }

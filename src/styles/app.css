@@ -20,6 +20,7 @@
 .page-head h1 { font-size: var(--text-3xl); line-height: 1.2; letter-spacing: -0.45px; }
 .page-title { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .save-state { font-size: var(--text-sm); color: var(--muted); }
+.save-state.is-failed { color: var(--danger); font-weight: 600; }
 .tabbar { display: none; }
 
 /* Cards and rows */
@@ -81,6 +82,11 @@
 .next-month h2 { font-size: var(--text-xl); }
 .close-card { display: grid; gap: 10px; text-align: center; }
 .close-card p { font-size: var(--text-sm); }
+/* Everything still standing between the month and its close, each line a way back to its step. */
+.close-todo { margin: 0; padding: 0 0 var(--space-1); list-style: none; display: grid; gap: 6px; text-align: left; }
+.close-todo li { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--muted); }
+.close-todo li::before { content: ""; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--border-strong); }
+.close-todo .link { text-align: left; }
 
 /* Month: the result card */
 .card.summary { padding: 0; overflow: hidden; border-color: transparent; box-shadow: var(--shadow-summary); }
@@ -250,6 +256,9 @@
 .data-table tr.is-muted .cell-name, .data-table tr.is-muted td.num { text-decoration: line-through; text-decoration-color: var(--border-strong); }
 .data-table td .text-input { height: var(--control-md); margin-top: 6px; max-width: 320px; font-size: var(--text-sm); }
 .data-table .money-input { width: 120px; }
+/* The column header and the total line say PLN; the rows do not repeat it. */
+.data-table .money-input span, .dt-card-amount .money-input span { display: none; }
+.data-table .money-input input { padding-right: var(--space-3); }
 .data-table .segmented-sm button { padding: 0 7px; font-size: var(--text-xs); }
 .data-table .bank-logo-name { white-space: normal; }
 .data-table tbody tr.is-dragging, .dt-card.is-dragging { position: relative; z-index: 1; background: var(--primary-soft); }
@@ -260,8 +269,6 @@
 .cell-flow svg { color: var(--muted); }
 .checked-mark { color: var(--primary); vertical-align: middle; }
 .actions .row-menu { display: inline-block; }
-.is-in { color: var(--in); }
-.is-out { color: var(--danger); }
 
 /* Tables: header controls */
 .dt-head { display: inline-flex; align-items: center; gap: 2px; }
