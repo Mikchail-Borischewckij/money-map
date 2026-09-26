@@ -48,7 +48,7 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
   return <Section step={step} title="Счета и переводы" open={open} onToggle={onToggle} done={done}
     total={pending > 0 && `Перевести ${money(summary.transfers.filter((transfer) => !transfer.done).reduce((sum, transfer) => sum + transfer.amount, 0))}`}
     meta={!readOnly && ready && progress(summary.transfers.length - pending, summary.transfers.length, 'Переведено')}>
-    <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} search={(account) => account.name} />
+    <DataTable label="Счета и переводы" rows={accounts} rowKey={(account) => account.id} columns={columns} />
     <h3 className="subhead">Что перевести</h3>
     {!readOnly && !ready && summary.transfers.length > 0 && <p className="note">Отметить переводы можно после проверки остатков, доходов и платежей.</p>}
     {summary.transfers.length === 0 ? <p className="muted">Переводы не нужны.</p> : <ol className="transfer-list">

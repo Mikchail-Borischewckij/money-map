@@ -76,7 +76,6 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
     <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns} rowTitle={(income) => income.name}
       rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
       defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Ожидается"
-      search={(income) => `${income.name} ${accountName(income.accountId)}`}
       actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
       empty={<Empty>Доходов пока нет. Регулярные доходы добавляются в настройках.</Empty>} />
     {adding && <OneOffDialog kind="income" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}

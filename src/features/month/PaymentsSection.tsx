@@ -28,7 +28,6 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
     <DataTable label="Платежи" rows={plan.payments} rowKey={(payment) => payment.id} rowClassName={paymentRowClass} rowTitle={(payment) => payment.name}
       columns={paymentColumns({ period: periodOfPlan(plan), readOnly, accountTag, accountName, onChange: change, onRemove: remove, onReset })}
       defaultSort={{ key: 'when', dir: 'asc' }}
-      search={(payment) => `${payment.name} ${payment.category} ${accountName(payment.accountId)}`}
       actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
       empty={<Empty>Платежей пока нет. Регулярные платежи добавляются в настройках.</Empty>} />
     {adding && <OneOffDialog kind="payment" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
