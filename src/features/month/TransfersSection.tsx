@@ -25,13 +25,13 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
   if (accounts.length === 0) return null
   const columns: Column<Row>[] = [
     { key: 'name', header: 'Счёт', sort: (account) => account.name, mobile: 'title', cell: (account) => accountTag(account.id) },
-    { key: 'available', header: 'Ожидается', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => money(account.available), footer: (rows) => money(sum(rows, (account) => account.available)) },
+    { key: 'available', header: 'Будет на счёте', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => money(account.available), footer: (rows) => money(sum(rows, (account) => account.available)) },
     { key: 'spent', header: 'К оплате', align: 'right', mobileLabel: true, sort: spent,
       cell: (account) => <span className={cx(spent(account) > 0 && 'is-out')}>{spent(account) ? `− ${money(spent(account))}` : money(0)}</span>,
       footer: (rows) => <span className="is-out">− {money(sum(rows, spent))}</span> },
     { key: 'moved', header: 'Перевод', align: 'right', mobileLabel: true, sort: moved,
       cell: (account) => <span className={cx(moved(account) > 0 ? 'is-in' : moved(account) < 0 && 'is-out')}>{signed(moved(account))}</span> },
-    { key: 'remaining', header: 'Остаток', align: 'right', mobile: 'amount', sort: (account) => account.remaining,
+    { key: 'remaining', header: 'Останется', align: 'right', mobile: 'amount', sort: (account) => account.remaining,
       cell: (account) => <strong className={cx(account.remaining < 0 && 'negative')}>{money(account.remaining)}</strong>,
       footer: (rows) => money(sum(rows, (account) => account.remaining)) },
   ]
@@ -49,7 +49,7 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
     {!readOnly && !ready && summary.transfers.length > 0 && <p className="note">Отметить переводы можно после проверки остатков, доходов и платежей.</p>}
     {summary.transfers.length === 0 ? <p className="muted">Переводы не нужны.</p> : <ol className="transfer-list">
       {summary.transfers.map((transfer) => <li key={transfer.id} className={cx(transfer.done && 'is-done')}>
-        <span className="transfer-route">{accountTag(transfer.fromAccountId)}<ArrowRight size={14} />{accountTag(transfer.toAccountId)}{topUp(transfer) && <Badge tone="warn">доперевести</Badge>}</span>
+        <span className="transfer-route">{accountTag(transfer.fromAccountId)}<ArrowRight size={14} />{accountTag(transfer.toAccountId)}{topUp(transfer) && <Badge tone="warn">Доперевести</Badge>}</span>
         <strong className="amount">{money(transfer.amount)}</strong>
         {readOnly
           ? <span className="transfer-check">{transfer.done && <Check size={16} className="checked-mark" aria-label="Переведено" />}</span>

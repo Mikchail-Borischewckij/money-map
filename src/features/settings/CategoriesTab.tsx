@@ -17,12 +17,12 @@ export default function CategoriesTab({ categories, csrfToken, run }: { categori
   const ofKind = categories.filter((category) => category.kind === kind)
   const active = ofKind.filter((category) => !category.is_archived)
   const archived = ofKind.filter((category) => category.is_archived)
-  const add = (name: string) => run(() => send('/api/categories', 'POST', csrfToken, { name, kind }), 'Категория добавлена.',
+  const add = (name: string) => run(() => send('/api/categories', 'POST', csrfToken, { name, kind }), 'Добавлено.',
     (lists) => ({ ...lists, categories: [...lists.categories, { id: `new-${crypto.randomUUID()}`, name, kind, is_archived: false, version: 0 }] }))
-  const update = (category: Category, patch: Partial<Category>) => run(() => send(`/api/categories/${category.id}`, 'PUT', csrfToken, { name: patch.name ?? category.name, isArchived: patch.is_archived ?? category.is_archived, version: category.version }), 'Сохранено.',
+  const update = (category: Category, patch: Partial<Category>, done = 'Сохранено.') => run(() => send(`/api/categories/${category.id}`, 'PUT', csrfToken, { name: patch.name ?? category.name, isArchived: patch.is_archived ?? category.is_archived, version: category.version }), done,
     (lists) => ({ ...lists, categories: lists.categories.map((item) => item.id === category.id ? { ...item, ...patch } : item) }))
   // Only a category no regular payment or income uses can be deleted; a used one can be archived.
-  const remove = (category: Category) => run(() => send(`/api/categories/${category.id}`, 'DELETE', csrfToken, { version: category.version }), 'Категория удалена.',
+  const remove = (category: Category) => run(() => send(`/api/categories/${category.id}`, 'DELETE', csrfToken, { version: category.version }), 'Удалено.',
     (lists) => ({ ...lists, categories: lists.categories.filter((item) => item.id !== category.id) }))
   const open = (category: Category | null) => { setEditing(category); setDraft(category?.name ?? '') }
   const save = () => {
@@ -38,14 +38,14 @@ export default function CategoriesTab({ categories, csrfToken, run }: { categori
     { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (category) => <RowMenu label={`Действия: ${category.name}`} items={[
       { label: 'Переименовать', onSelect: () => open(category) },
       category.in_use
-        ? { label: 'В архив', danger: true, onSelect: () => void update(category, { is_archived: true }) }
+        ? { label: 'В архив', danger: true, onSelect: () => void update(category, { is_archived: true }, 'В архиве.') }
         : { label: 'Удалить', danger: true, onSelect: () => void remove(category) },
     ]} /> },
   ]
   const archivedColumns: Column<Category>[] = [name, used,
     { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (category) => <div className="cell-actions">
       {!category.in_use && <Button size="sm" variant="ghost" onClick={() => void remove(category)}>Удалить</Button>}
-      <Button size="sm" onClick={() => void update(category, { is_archived: false })}>Вернуть</Button>
+      <Button size="sm" onClick={() => void update(category, { is_archived: false }, 'Вернули из архива.')}>Вернуть из архива</Button>
     </div> },
   ]
 
@@ -59,7 +59,7 @@ export default function CategoriesTab({ categories, csrfToken, run }: { categori
       columns={tab === 'active' ? activeColumns : archivedColumns} rowClassName={tab === 'archived' ? () => 'is-muted' : undefined}
       defaultSort={{ key: 'name', dir: 'asc' }} search={(category) => category.name}
       actions={tab === 'active' && <AddButton onClick={() => open(null)} />}
-      empty={<Empty>{tab === 'active' ? 'Категорий пока нет.' : 'В архиве пусто.'}</Empty>} />
+      empty={<Empty>{tab === 'active' ? 'Категорий пока нет.' : 'В архиве пока пусто.'}</Empty>} />
     {editing !== undefined && <Dialog title={editing ? 'Переименовать' : 'Новая категория'} onClose={() => setEditing(undefined)}
       actions={<><Button onClick={() => setEditing(undefined)}>Отмена</Button><Button variant="primary" disabled={!draft.trim()} onClick={save}>{editing ? 'Сохранить' : 'Добавить'}</Button></>}>
       <form onSubmit={(event) => { event.preventDefault(); save() }}>

@@ -73,7 +73,7 @@ export default function SummaryPage() {
     cell: (month) => { const amount = value(month); return <span className={cx('summary-cell', negative && amount.pln < 0 && 'negative')}>{pln(amount.pln)} PLN<span className="summary-usd">$ {usd(amount.usd)}</span></span> },
   })
   const monthColumns: Column<SummaryMonth>[] = [
-    { key: 'month', header: 'Период', mobile: 'title', sort: (month) => month.month, cell: (month) => <span className="cell-name"><span className="cell-text">{periodTitle(month.month, month.startDay)}</span>{month.open && <Badge tone="blue">план</Badge>}</span> },
+    { key: 'month', header: 'Период', mobile: 'title', sort: (month) => month.month, cell: (month) => <span className="cell-name"><span className="cell-text">{periodTitle(month.month, month.startDay)}</span>{month.open && <Badge tone="blue">План</Badge>}</span> },
     monthColumn('Доходы', (month) => summarize([month]).income, 'income'),
     monthColumn('Расходы', (month) => summarize([month]).expenses, 'expenses'),
     monthColumn('Итого', (month) => summarize([month]).result, 'result', true),
@@ -95,7 +95,7 @@ export default function SummaryPage() {
       <section className="card">
         <header className="card-head"><div className="page-title">
           <h2>{range === 'all' ? 'Всё время' : range === 'year' ? `${pickedYear} год` : single ? periodTitle(single.month, single.startDay) : ''}</h2>
-          {selected.some((month) => month.open) && <Badge tone="blue">{several ? 'с открытым месяцем' : 'план'}</Badge>}
+          {selected.some((month) => month.open) && <Badge tone="blue">{several ? 'С открытым месяцем' : 'План'}</Badge>}
         </div></header>
         <div className="table-scroll">
           <table className="money-table summary-table">

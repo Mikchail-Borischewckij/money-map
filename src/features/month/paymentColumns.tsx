@@ -25,10 +25,10 @@ export function paymentColumns({ period, readOnly, accountTag, accountName, onCh
   return [
     { key: 'name', header: 'Платёж', sort: (payment) => payment.name, mobile: 'title', cell: (payment) => <span className="cell-name">
       <span className="cell-text">{payment.name}</span>
-      {!payment.recurringPaymentId && <Badge>разовый</Badge>}
+      {!payment.recurringPaymentId && <Badge>Разовый</Badge>}
       {payment.enabled && <Attention notes={[
-        ...(amountToCheck(payment) && !payment.checked ? [{ label: 'уточнить сумму', reason: 'Укажите точную сумму и подтвердите платёж' }] : []),
-        ...(past(payment) ? [{ label: 'уже оплачен?', reason: 'Дата раньше даты остатков. Платёж может быть уже учтён' }] : []),
+        ...(amountToCheck(payment) && !payment.checked ? [{ label: 'Уточнить сумму', reason: 'Укажите точную сумму и подтвердите платёж' }] : []),
+        ...(past(payment) ? [{ label: 'Уже оплачен?', reason: 'Дата раньше даты расчёта. Платёж может быть уже списан' }] : []),
       ]} />}
     </span> },
     { key: 'account', header: 'Счёт', sort: (payment) => accountName(payment.accountId), filter: { type: 'list', value: (payment) => payment.accountId, label: accountName }, cell: (payment) => accountTag(payment.accountId) },
@@ -54,10 +54,11 @@ export function paymentColumns({ period, readOnly, accountTag, accountName, onCh
     { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (payment) => {
       if (readOnly) return null
       if (!payment.enabled) return <Button size="sm" onClick={() => onChange(payment.id, { enabled: true })}>Вернуть</Button>
+      // "Уже оплачен" used to be a second item doing exactly what "Не платить в этом месяце" does; one is enough.
       const menu: MenuItem[] = [
-        ...(past(payment) ? [{ label: 'Уже оплачен', onSelect: () => onChange(payment.id, { enabled: false }) }] : []),
+        { label: 'Не платить в этом месяце', onSelect: () => onChange(payment.id, { enabled: false }) },
         ...(payment.recurringPaymentId
-          ? [{ label: 'Не платить в этом месяце', onSelect: () => onChange(payment.id, { enabled: false }) }, ...(payment.checked ? [] : [{ label: 'Как в настройках', onSelect: () => onReset(payment.id) }])]
+          ? payment.checked ? [] : [{ label: 'Вернуть как в настройках', onSelect: () => onReset(payment.id) }]
           : [{ label: 'Удалить', danger: true, onSelect: () => onRemove(payment.id) }]),
       ]
       return <RowMenu label={`Действия: ${payment.name}`} items={menu} />

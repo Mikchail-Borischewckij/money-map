@@ -25,7 +25,7 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
       defaultSort={{ key: 'when', dir: 'asc' }}
       search={(payment) => `${payment.name} ${payment.category} ${accountName(payment.accountId)}`}
       actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
-      empty={<Empty>Платежей нет. Регулярные платежи добавляются в настройках.</Empty>} />
+      empty={<Empty>Платежей пока нет. Регулярные платежи добавляются в настройках.</Empty>} />
     {adding && <OneOffDialog kind="payment" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
       onSave={({ name, amount, accountId, day, category }) => {
         update((current) => ({ ...current, payments: [...current.payments, { id: crypto.randomUUID(), name, amount, accountId, category, enabled: true, due: day ? dayInPlan(current, day) : 'в течение месяца' }] }))

@@ -41,7 +41,7 @@ export default function HistoryPage() {
       <div className="rows">
         {items?.map((item) => <button type="button" className="row row-button" key={item.id} onClick={() => void open(item.id)}>
           <div className="row-main"><strong>{periodTitle(monthKey(item.year, item.month), item.startDay)}</strong><span className="row-meta">Платежи {money(item.totalPayments / 100)} · отложено {money(item.totalSavings / 100)}</span></div>
-          <div className="row-side"><span className={cx('amount', item.freeAfterPlan < 0 && 'negative')}>{item.freeAfterPlan < 0 ? 'Не хватало ' : 'Остаток '}{money(Math.abs(item.freeAfterPlan) / 100)}</span></div>
+          <div className="row-side"><span className={cx('amount', item.freeAfterPlan < 0 && 'negative')}>{item.freeAfterPlan < 0 ? 'Не хватило ' : 'На жизнь '}{money(Math.abs(item.freeAfterPlan) / 100)}</span></div>
         </button>)}
       </div>
     </section>

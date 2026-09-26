@@ -31,9 +31,9 @@ export default function AccountDialog({ account, accounts, onClose, onSave }: { 
       <Field label="Тип"><Select label="Тип" value={kind} options={kindOptions} onChange={setKind} /></Field>
       {!cash && <Field label="Банк" wide><BankPicker value={bank} onChange={setBank} /></Field>}
       {business ? <>
-        <Field label="Остаток переводить на"><Select label="Остаток переводить на" value={sweepTo} placeholder="Выберите счёт" options={targets.map((item) => ({ value: item.id, label: item.name }))} onChange={setSweepTo} /></Field>
+        <Field label="Излишек переводить на"><Select label="Излишек переводить на" value={sweepTo} placeholder="Выберите счёт" options={targets.map((item) => ({ value: item.id, label: item.name }))} onChange={setSweepTo} /></Field>
         <Field label="Оставлять на счёте"><MoneyInput label="Оставлять на счёте" value={keep} onChange={setKeep} /></Field>
-        <p className="note field-wide">Добавьте налоги и бухгалтерию в платежи этого счёта. Остаток сверх них и того, что оставляется, переводится на выбранный счёт.</p>
+        <p className="note field-wide">Добавьте налоги и бухгалтерию в платежи этого счёта. Излишек сверх них и того, что оставляется, переводится на выбранный счёт.</p>
         {targets.length === 0 && <p className="form-error">Сначала добавьте личный счёт.</p>}
       </> : <>
         <Field label="Оставлять на счёте"><MoneyInput label="Оставлять на счёте" value={keep} onChange={setKeep} /></Field>

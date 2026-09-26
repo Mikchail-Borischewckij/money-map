@@ -32,10 +32,10 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   const columns: Column<Income>[] = [
     { key: 'name', header: 'Доход', sort: (income) => income.name, mobile: 'title', cell: (income) => <span className="cell-name">
       <span className="cell-text">{income.name}</span>
-      {!income.recurringIncomeId && <Badge>разовый</Badge>}
+      {!income.recurringIncomeId && <Badge>Разовый</Badge>}
       <Attention notes={[
-        ...(amountToCheck(income) && !income.checked ? [{ label: 'уточнить сумму', reason: 'Укажите точную сумму или подтвердите текущую' }] : []),
-        ...(isPast(income) && !income.checked ? [{ label: 'уже получен?', reason: 'Дата раньше даты остатков. Доход может быть уже учтён' }] : []),
+        ...(amountToCheck(income) && !income.checked ? [{ label: 'Уточнить сумму', reason: 'Укажите точную сумму или подтвердите текущую' }] : []),
+        ...(isPast(income) && !income.checked ? [{ label: 'Уже получен?', reason: 'Дата раньше даты расчёта. Доход может быть уже на счёте' }] : []),
       ]} />
     </span> },
     { key: 'account', header: 'Счёт', sort: (income) => accountName(income.accountId), filter: { type: 'list', value: (income) => income.accountId, label: accountName }, cell: (income) => accountTag(income.accountId) },
@@ -56,7 +56,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
     { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (income) => {
       if (readOnly) return null
       const menu: MenuItem[] = income.recurringIncomeId
-        ? income.checked ? [] : [{ label: 'Как в настройках', onSelect: () => onReset(income.id) }]
+        ? income.checked ? [] : [{ label: 'Вернуть как в настройках', onSelect: () => onReset(income.id) }]
         : [{ label: 'Удалить', danger: true, onSelect: () => remove(income.id) }]
       return <RowMenu label={`Действия: ${income.name}`} items={menu} />
     } },
@@ -69,7 +69,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
       defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Ожидается"
       search={(income) => `${income.name} ${accountName(income.accountId)}`}
       actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
-      empty={<Empty>Доходов нет. Регулярные доходы добавляются в настройках.</Empty>} />
+      empty={<Empty>Доходов пока нет. Регулярные доходы добавляются в настройках.</Empty>} />
     {adding && <OneOffDialog kind="income" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
       onSave={({ name, amount, accountId, day, category }) => {
         update((current) => ({ ...current, incomes: [...current.incomes, { id: crypto.randomUUID(), name, amount, accountId, expectedOn: day ? dayInPlan(current, day) : '', enabled: true, status: 'expected', category }] }))

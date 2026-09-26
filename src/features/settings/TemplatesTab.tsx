@@ -45,10 +45,10 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
   const archivedTab = tab === 'archived'
   const lastMonth = (item: Template) => !ended(item) && item.active_to !== null
   const menu = (item: Template) => <RowMenu label={`Действия: ${item.name}`} items={ended(item) || lastMonth(item)
-    ? [{ label: 'Снова нужен', onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, false)), 'Снова действует.', patchItem(item.id, { active_to: null, is_archived: false })) }]
+    ? [{ label: 'Вернуть из архива', onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, false)), 'Вернули из архива.', patchItem(item.id, { active_to: null, is_archived: false })) }]
     : [
       { label: 'Изменить', onSelect: () => setEditing(item) },
-      { label: 'Больше не нужен', danger: true, onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, true)), 'Готово. В этом месяце остаётся, в следующие не попадёт.', patchItem(item.id, { active_to: today })) },
+      { label: 'В архив', danger: true, onSelect: () => void run(() => send(`${url}/${item.id}`, 'PUT', csrfToken, payload(formOf(item), item.version, true)), 'В архиве. В этом месяце остаётся, в следующие не попадёт.', patchItem(item.id, { active_to: today })) },
     ]} />
   const account = (item: Template) => {
     const source = accounts.find((candidate) => candidate.id === item.account_id)
@@ -57,7 +57,7 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
 
   const columns: Column<Template>[] = [
     { key: 'name', header: 'Название', sort: (item) => item.name, mobile: 'title', cell: (item) => <span className="cell-name">
-      <span className="cell-text">{item.name}</span>{lastMonth(item) && <Badge tone="warn">последний месяц</Badge>}{item.amount_varies && <Badge>сумма меняется</Badge>}
+      <span className="cell-text">{item.name}</span>{lastMonth(item) && <Badge tone="warn">Последний месяц</Badge>}{item.amount_varies && <Badge>Сумма меняется</Badge>}
     </span> },
     { key: 'when', header: 'Когда', sort: (item) => item.day ?? (item.schedule === 'weekly' ? 0 : 99), cell: scheduleText },
     { key: 'account', header: 'Счёт', sort: (item) => accountName(item.account_id), filter: { type: 'list', value: (item) => item.account_id, label: accountName }, cell: account },
@@ -83,7 +83,7 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
       rowClassName={archivedTab ? () => 'is-muted' : undefined} defaultSort={{ key: 'when', dir: 'asc' }}
       search={(item) => `${item.name} ${accountName(item.account_id)} ${categoryName(item.category_id)}`}
       actions={!archivedTab && <AddButton disabled={noAccounts} onClick={() => setEditing('new')} />}
-      empty={!noAccounts && <Empty>{archivedTab ? 'В архиве пусто.' : 'Пока пусто.'}</Empty>} />
+      empty={!noAccounts && <Empty>{archivedTab ? 'В архиве пока пусто.' : payments ? 'Регулярных платежей пока нет.' : 'Регулярных доходов пока нет.'}</Empty>} />
     {editing && <TemplateDialog kind={kind} value={editing === 'new' ? null : formOf(editing)}
       accounts={accounts.filter((account) => !account.is_archived || (editing !== 'new' && account.id === editing.account_id))}
       categories={categories.filter((category) => !category.is_archived)} onClose={() => setEditing(null)} onSave={save} />}

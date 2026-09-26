@@ -35,7 +35,7 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
   const reorder = (keys: string[]) => {
     const changes = keys.map((id, position) => ({ account: order.find((account) => account.id === id)!, priority: (position + 1) * 10 })).filter(({ account, priority }) => account.transfer_priority !== priority)
     if (changes.length === 0) return
-    void run(() => Promise.all(changes.map(({ account, priority }) => send(`/api/accounts/${account.id}`, 'PUT', csrfToken, body(account, { transfer_priority: priority })))), 'Порядок сохранён.',
+    void run(() => Promise.all(changes.map(({ account, priority }) => send(`/api/accounts/${account.id}`, 'PUT', csrfToken, body(account, { transfer_priority: priority })))), 'Сохранено.',
       (lists) => ({ ...lists, accounts: lists.accounts.map((account) => ({ ...account, transfer_priority: changes.find((change) => change.account.id === account.id)?.priority ?? account.transfer_priority })) }))
   }
 
@@ -57,11 +57,11 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
   const transfers = (account: AccountRow) => {
     const keep = Number(account.keep_amount ?? 0)
     const kept = keep > 0 && <span className="muted">оставлять {money(keep / 100)}</span>
-    if (account.kind === 'business') return <span className="cell-flow">{account.sweep_to_account_id ? <>Остаток <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Остаток не переводится'}{kept}</span>
+    if (account.kind === 'business') return <span className="cell-flow">{account.sweep_to_account_id ? <>Излишек <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Излишек не переводится'}{kept}</span>
     return <span className="cell-flow">{account.kind === 'cash' ? <span className="muted">Только пополнение</span> : account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>}{kept}</span>
   }
   // An archived account comes back last in the transfer order and appears in the open month again.
-  const restore = (account: AccountRow) => run(() => send(`/api/accounts/${account.id}/restore`, 'POST', csrfToken, { expectedVersion: account.version }), 'Счёт снова в работе. Он появился в открытом месяце.',
+  const restore = (account: AccountRow) => run(() => send(`/api/accounts/${account.id}/restore`, 'POST', csrfToken, { expectedVersion: account.version }), 'Вернули из архива. Счёт появился в открытом месяце.',
     patch(account.id, { is_archived: false, transfer_priority: (order.length + 1) * 10 }))
   const save = (value: AccountValue) => {
     const current = editing === 'new' ? null : editing
@@ -69,7 +69,7 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     void run(() => current
       ? send(`/api/accounts/${current.id}`, 'PUT', csrfToken, body(current, fields(value)))
       : send('/api/accounts', 'POST', csrfToken, { name: value.name, bank: value.bank, kind: value.kind, canFundTransfers: value.canFundTransfers, priority: (order.length + 1) * 10, sweepToAccountId: value.sweepToAccountId, keepAmount: toCents(value.keepAmount) }),
-    current ? 'Счёт сохранён.' : 'Счёт добавлен.',
+    current ? 'Сохранено.' : 'Добавлено.',
     current ? patch(current.id, fields(value))
       : (lists) => ({ ...lists, accounts: [...lists.accounts, { id: `new-${crypto.randomUUID()}`, transfer_priority: (order.length + 1) * 10, is_archived: false, version: 0, ...fields(value) } as AccountRow] }))
   }
@@ -86,14 +86,14 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
       </>}
       <RowMenu label={`Действия: ${account.name}`} items={[
         { label: 'Изменить', onSelect: () => setEditing(account) },
-        { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
+        { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'В архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
       ]} />
     </div> },
   ]
   const archivedColumns: Column<AccountRow>[] = [
     { key: 'name', header: 'Счёт', mobile: 'title', sort: (account) => account.name, cell: (account) => badge(account.id) },
     { key: 'kind', header: 'Тип', sort: kindLabel, filter: { type: 'list', value: kindLabel }, cell: kindLabel },
-    { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (account) => <Button size="sm" onClick={() => void restore(account)}>Вернуть</Button> },
+    { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: (account) => <Button size="sm" onClick={() => void restore(account)}>Вернуть из архива</Button> },
   ]
 
   return <section className="card">
@@ -104,7 +104,7 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
         reorder={{ canMove: ranked, onMove: reorder, label: (account) => account.name }}
         actions={<AddButton onClick={() => setEditing('new')} />} empty={<Empty>Счетов пока нет.</Empty>} />
       : <DataTable key="archived" label="Счета в архиве" rows={archived} rowKey={(account) => account.id} columns={archivedColumns} rowClassName={() => 'is-muted'}
-        defaultSort={{ key: 'name', dir: 'asc' }} search={(account) => account.name} empty={<Empty>В архиве пусто.</Empty>} />}
+        defaultSort={{ key: 'name', dir: 'asc' }} search={(account) => account.name} empty={<Empty>В архиве пока пусто.</Empty>} />}
     {editing && <AccountDialog account={editing === 'new' ? null : editing} accounts={accounts} onClose={() => setEditing(null)} onSave={save} />}
   </section>
 }
