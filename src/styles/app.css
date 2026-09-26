@@ -74,9 +74,6 @@
 .units { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .units-cell { justify-content: flex-end; }
 .units-price { font-size: var(--text-md); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.keep-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--muted); }
-.keep-field .money-input { width: 120px; }
-.keep-field .money-input input { color: var(--text); }
 .balances-date { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); color: var(--muted); }
 .balances-date .select-compact { width: 200px; }
 .add-saving { justify-self: start; }
@@ -430,9 +427,7 @@
   .row-side-wrap .segmented { flex: 1 1 100%; }
   .row-side-wrap .segmented button { flex: 1; }
   .amount-locked { min-width: 0; margin-left: auto; }
-  .keep-field { order: 2; flex-basis: 100%; justify-content: space-between; }
-  .keep-field .money-input { width: 140px; }
-  .units { flex: 1; }
+      .units { flex: 1; }
   .units-price { font-size: var(--text-sm); }
   .money-input { width: 140px; margin-left: auto; }
   .select-compact { flex: 1; width: auto; }

@@ -144,17 +144,15 @@ describe('business account', () => {
     expect(extra.accounts.find((account) => account.id === 'bills')!.remaining).toBe(3_000)
   })
 
-  it('keeps the amount to keep on any account: tops it up and never takes it', () => {
+  it('ignores a reserve left on a personal account: what is not spent is money to live on', () => {
     const plan: MoneyPlan = { month: '2026-09', incomes: [], allocations: [], accounts: [
       { id: 'main', name: 'Основной', kind: 'current', openingBalance: 10_000, canFundTransfers: true, priority: 1, keepAmount: 2_000 },
       { id: 'card', name: 'Карта', kind: 'current', openingBalance: 0, canFundTransfers: false, priority: 2, keepAmount: 1_000 },
     ], payments: [{ id: 'fee', name: 'Подписка', amount: 5_000, accountId: 'card', due: '', enabled: true, category: '' }] }
     const result = calculateMoneyPlan(plan)
-    expect(result.transfers).toEqual([expect.objectContaining({ fromAccountId: 'main', toAccountId: 'card', amount: 6_000 })])
-    expect(result.accounts.map((account) => account.remaining)).toEqual([4_000, 1_000])
-    expect(result.totalKeep).toBe(3_000)
-    expect(result.freeAfterPlan).toBe(10_000 - 5_000 - 3_000)
-    plan.accounts[1].keepAmount = 5_000
-    expect(calculateMoneyPlan(plan).uncovered).toBe(2_000)
+    expect(result.totalKeep).toBe(0)
+    expect(result.transfers).toEqual([expect.objectContaining({ fromAccountId: 'main', toAccountId: 'card', amount: 5_000 })])
+    expect(result.accounts.map((account) => account.remaining)).toEqual([5_000, 0])
+    expect(result.freeAfterPlan).toBe(10_000 - 5_000)
   })
 })

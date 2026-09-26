@@ -22,11 +22,8 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
         <div className="row-main"><strong><AccountBadge name={account.name} bank={account.bank} /></strong></div>
         <div className="row-side">
           {/* A checked balance is locked; uncheck it to correct the amount. */}
-          <Amount label={`Остаток: ${account.name}`} value={account.openingBalance} readOnly={readOnly || Boolean(account.balanceConfirmed)} className="amount-locked"
+          <Amount label={`Сколько на счёте: ${account.name}`} value={account.openingBalance} readOnly={readOnly || Boolean(account.balanceConfirmed)} className="amount-locked"
             onChange={(openingBalance) => change(account.id, { openingBalance })} />
-          {/* What must stay on the account this month (a fee, a reserve); starts from the account setting. */}
-          {(!readOnly || Boolean(account.keepAmount)) && <label className="keep-field"><span>Оставить</span>
-            <Amount label={`Оставить на счёте: ${account.name}`} value={account.keepAmount ?? 0} readOnly={readOnly} onChange={(keepAmount) => change(account.id, { keepAmount })} /></label>}
           {readOnly
             ? <Badge tone={account.balanceConfirmed ? 'ok' : 'warn'}>{account.balanceConfirmed ? 'Проверено' : 'Не проверено'}</Badge>
             : <Checkbox checked={account.balanceConfirmed ?? false} onChange={(balanceConfirmed) => change(account.id, { balanceConfirmed, balanceDate: balanceConfirmed ? today() : null })}>Проверено</Checkbox>}

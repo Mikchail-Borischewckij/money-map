@@ -1,4 +1,5 @@
-// `keepAmount`: what must stay on the account this month (a fee, a reserve); it counts like a payment of the account.
+// `keepAmount`: the reserve a BUSINESS account holds back from its sweep; it counts like a payment of that account.
+// Personal and cash accounts have no reserve — whatever they do not spend simply stays on them and is money to live on.
 // `sweepToAccountId`: a business account sends everything above its own payments and `keepAmount` to this account in one transfer.
 export type MoneyAccount = { id: string; name: string; bank?: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean; sweepToAccountId?: string | null; keepAmount?: number }
 export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean; checked?: boolean; category?: string }
@@ -40,7 +41,7 @@ export function calculateMoneyPlan(plan: MoneyPlan) {
     const expectedIncome = plan.incomes.filter((income) => income.enabled && income.status === 'expected' && income.accountId === account.id).reduce((sum, income) => sum + cents(income.amount), 0n)
     const payments = plan.payments.filter((payment) => payment.enabled && payment.accountId === account.id).reduce((sum, payment) => sum + cents(payment.amount), 0n)
     const allocations = plan.allocations.filter((allocation) => allocation.accountId === account.id).reduce((sum, allocation) => sum + cents(allocation.amount), 0n)
-    const keep = cents(account.keepAmount ?? 0)
+    const keep = isBusiness(account) ? cents(account.keepAmount ?? 0) : 0n
     return { account, available: opening + expectedIncome, expectedIncome, payments, allocations, keep, incoming: 0n, outgoing: 0n }
   })
   const byId = new Map(base.map((item) => [item.account.id, item]))

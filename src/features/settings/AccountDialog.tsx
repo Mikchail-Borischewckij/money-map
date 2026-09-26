@@ -7,8 +7,8 @@ import { kindOptions, type AccountKind, type AccountRow } from './types'
 
 export type AccountValue = { name: string; bank: BankId; kind: AccountKind; canFundTransfers: boolean; sweepToAccountId: string | null; keepAmount: number }
 
-// A business account pays its own bills and sends the rest to one personal account in a single transfer.
-// Any account can keep an amount untouched each month (a fee, a reserve); the month starts from it and can change it.
+// A business account pays its own bills, holds back a reserve and sends the rest to one personal account in a single
+// transfer. Only a business account has that reserve: on a personal account, whatever is not spent is money to live on.
 export default function AccountDialog({ account, accounts, onClose, onSave }: { account: AccountRow | null; accounts: AccountRow[]; onClose: () => void; onSave: (value: AccountValue) => void }) {
   const [name, setName] = useState(account?.name ?? '')
   const [bank, setBank] = useState<BankId | ''>(account && account.bank !== 'cash' ? account.bank ?? inferBank(account.name) : '')
@@ -23,7 +23,7 @@ export default function AccountDialog({ account, accounts, onClose, onSave }: { 
   const valid = Boolean(name.trim() && (cash || bank)) && (!business || Boolean(sweepTo))
   const save = () => {
     if (!valid) return
-    onSave({ name: name.trim(), bank: cash ? 'cash' : bank as BankId, kind, canFundTransfers: business || cash ? false : canFundTransfers, sweepToAccountId: business ? sweepTo : null, keepAmount: keep })
+    onSave({ name: name.trim(), bank: cash ? 'cash' : bank as BankId, kind, canFundTransfers: business || cash ? false : canFundTransfers, sweepToAccountId: business ? sweepTo : null, keepAmount: business ? keep : 0 })
   }
   return <Dialog title={account ? 'Счёт' : 'Новый счёт'} onClose={onClose} actions={<><Button onClick={onClose}>Отмена</Button><Button variant="primary" disabled={!valid} onClick={save}>Сохранить</Button></>}>
     <form className="form-grid" onSubmit={(event) => { event.preventDefault(); save() }}>
@@ -35,11 +35,7 @@ export default function AccountDialog({ account, accounts, onClose, onSave }: { 
         <Field label="Оставлять на счёте"><MoneyInput label="Оставлять на счёте" value={keep} onChange={setKeep} /></Field>
         <p className="note field-wide">Добавьте налоги и бухгалтерию в платежи этого счёта. Излишек сверх них и того, что оставляется, переводится на выбранный счёт.</p>
         {targets.length === 0 && <p className="form-error">Сначала добавьте личный счёт.</p>}
-      </> : <>
-        <Field label="Оставлять на счёте"><MoneyInput label="Оставлять на счёте" value={keep} onChange={setKeep} /></Field>
-        {!cash && <div className="field field-wide"><Switch checked={canFundTransfers} onChange={setCanFundTransfers}>Можно брать деньги для переводов</Switch></div>}
-        <p className="note field-wide">Сумма, которая остаётся на счёте каждый месяц: на комиссию или про запас. В самом месяце её можно поменять.</p>
-      </>}
+      </> : !cash && <div className="field field-wide"><Switch checked={canFundTransfers} onChange={setCanFundTransfers}>Можно брать деньги для переводов</Switch></div>}
       <button type="submit" hidden />
     </form>
   </Dialog>

@@ -16,8 +16,9 @@ export default function SummaryCard({ summary }: { summary: PlanSummary }) {
       <div><dt>Всего денег</dt><dd>{money(summary.totalAvailable)}</dd></div>
       <div><dt>Платежи</dt><dd>− {money(summary.totalPayments)}</dd></div>
       {summary.totalSavings > 0 && <div><dt>Отложить</dt><dd>− {money(summary.totalSavings)}</dd></div>}
-      {summary.totalKeep > 0 && <div><dt>Оставить на счетах</dt><dd>− {money(summary.totalKeep)}</dd></div>}
-      {summary.totalLiving > 0 && <div><dt>На жизнь (отдельно)</dt><dd>− {money(summary.totalLiving)}</dd></div>}
+      {/* Only a business account holds a reserve, and only closed months from before rule 8 plan living money apart. */}
+      {summary.totalKeep > 0 && <div><dt>Запас на бизнес-счетах</dt><dd>− {money(summary.totalKeep)}</dd></div>}
+      {summary.totalLiving > 0 && <div><dt>Запланировано на жизнь</dt><dd>− {money(summary.totalLiving)}</dd></div>}
     </dl>
     {summary.uncovered > 0 && <p className="summary-foot warn-text">Не покрыто {money(summary.uncovered)}. Проверьте счета и переводы.</p>}
   </section>
