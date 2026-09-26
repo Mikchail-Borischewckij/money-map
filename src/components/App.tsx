@@ -5,6 +5,7 @@ import { Button } from '@/components/ui'
 import HistoryPage from '@/features/history/HistoryPage'
 import MonthPage from '@/features/month/MonthPage'
 import SettingsPage from '@/features/settings/SettingsPage'
+import SummaryPage from '@/features/summary/SummaryPage'
 import { useMonthPlan } from '@/hooks/useMonthPlan'
 import type { ServerRecord } from '@/lib/api-client'
 import type { CategoryNames } from '@/lib/domain'
@@ -41,6 +42,7 @@ export default function App({ initial, nextMonth, csrfToken, displayName }: { in
         <Button size="sm" onClick={month.loadServer}>Загрузить с сервера</Button>
       </div>}
       {view === 'month' && <MonthPage month={month} categories={categories} onOpenSettings={() => setView('settings')} />}
+      {view === 'summary' && <SummaryPage />}
       {view === 'history' && <HistoryPage />}
       {view === 'settings' && <SettingsPage csrfToken={csrfToken} onChanged={() => { void loadCategories(); month.refreshAfterSettings() }} />}
     </main>
