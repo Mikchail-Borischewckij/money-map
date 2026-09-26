@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, GripVertical, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, GripVertical, Search, X } from 'lucide-react'
 import { cx } from '@/lib/format'
 import Button from './Button'
 import Checkbox from './Checkbox'
@@ -227,13 +227,18 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const filtered = Object.keys(filters).length > 0 || Boolean(text)
   const hasFooter = columns.some((column) => column.footer)
   const align = (column: Column<T>) => cx(column.align === 'right' && 'num', column.align === 'center' && 'center', column.className)
-  const nothing = <p className="dt-nothing muted">Ничего не найдено.{filtered && <> <button type="button" className="link" onClick={() => { setFilters({}); setQuery('') }}>Сбросить фильтры</button></>}</p>
+  const reset = () => { setFilters({}); setQuery(''); setPage(1) }
+  const nothing = <p className="dt-nothing muted">Ничего не найдено.</p>
 
-  const toolbar = (search && !fixed) || actions ? <div className={cx('table-toolbar', !(search && !fixed) && 'is-plain')}>
+  const toolbar = (search && !fixed) || actions || filtered ? <div className={cx('table-toolbar', !(search && !fixed) && 'is-plain')}>
     {search && !fixed && <label className="table-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Поиск</span>
       <input value={query} placeholder="Поиск" onChange={(event) => { setQuery(event.target.value); setPage(1) }} />
+      {query && <button type="button" className="table-search-clear" aria-label="Очистить поиск" onClick={() => { setQuery(''); setPage(1) }}><X size={14} /></button>}
     </label>}
-    {actions && <div className="table-toolbar-actions">{actions}</div>}
+    {(filtered || actions) && <div className="table-toolbar-actions">
+      {filtered && <Button size="sm" icon={<X size={16} />} aria-label="Сбросить фильтры" onClick={reset}><span className="btn-label">Сбросить</span></Button>}
+      {actions}
+    </div>}
   </div> : null
 
   if (rows.length === 0) return wrapped(<>{toolbar}{empty}</>)
