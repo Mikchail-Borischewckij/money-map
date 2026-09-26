@@ -36,7 +36,10 @@ export default function Select<T extends string>({ value, options, onChange, lab
     if (rect) {
       const below = window.innerHeight - rect.bottom - 12
       const up = below < 200 && rect.top > below
-      setPlace({ left: rect.left, minWidth: rect.width, maxHeight: Math.min(280, (up ? rect.top : window.innerHeight - rect.bottom) - 12), ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) })
+      const horizontal = rect.left > window.innerWidth - rect.right
+        ? { right: Math.max(12, window.innerWidth - rect.right) }
+        : { left: Math.max(12, rect.left) }
+      setPlace({ ...horizontal, minWidth: rect.width, maxHeight: Math.min(280, (up ? rect.top : window.innerHeight - rect.bottom) - 12), ...(up ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) })
     }
     keyboard.current = true
     setActive(Math.max(0, options.findIndex((option) => option.value === value)))

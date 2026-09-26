@@ -5,9 +5,9 @@ import { Badge, Empty, Select } from '@/components/ui'
 import { cx, periodTitle } from '@/lib/format'
 import { summarize, type Amounts, type SummaryMonth } from '@/lib/summary'
 
-const whole = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 })
-const pln = (grosz: number) => whole.format(Math.round(grosz / 100))
-const usd = (cents: number | null) => cents === null ? '—' : whole.format(Math.round(cents / 100))
+const twoDecimals = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const pln = (grosz: number) => twoDecimals.format(grosz / 100)
+const usd = (cents: number | null) => cents === null ? '—' : twoDecimals.format(cents / 100)
 const rateText = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 const dateText = (date: string) => new Intl.DateTimeFormat('ru-RU', { timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`))
 
