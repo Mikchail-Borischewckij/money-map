@@ -14,7 +14,7 @@ import { beforeBalances, dayInPlan, dayText, incomeToCheck, isDate, periodOfPlan
 const statusOf = (income: Income) => income.enabled ? income.status : 'excluded'
 const statusLabel = (status: string) => incomeStatuses.find((item) => item.value === status)?.label ?? status
 
-export default function IncomesSection({ plan, readOnly, update, accountTag, accounts, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountTag: (id: string) => React.ReactNode; accounts: Account[]; onReset: (id: string) => void }) {
+export default function IncomesSection({ plan, readOnly, update, accountTag, accounts, categories, onReset }: { plan: Plan; readOnly: boolean; update: UpdatePlan; accountTag: (id: string) => React.ReactNode; accounts: Account[]; categories: string[]; onReset: (id: string) => void }) {
   const [adding, setAdding] = useState(false)
   const change = (id: string, patch: Partial<Income>) => update((current) => ({ ...current, incomes: current.incomes.map((income) => income.id === id ? { ...income, ...patch } : income) }))
   const remove = (id: string) => update((current) => ({ ...current, incomes: current.incomes.filter((income) => income.id !== id) }))
@@ -67,9 +67,9 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
       search={(income) => `${income.name} ${accountName(income.accountId)}`}
       actions={!readOnly && <AddButton onClick={() => setAdding(true)} />}
       empty={<Empty>Доходов нет. Регулярные доходы добавляются в настройках.</Empty>} />
-    {adding && <OneOffDialog kind="income" plan={plan} accounts={accounts} categories={[]} onClose={() => setAdding(false)}
-      onSave={({ name, amount, accountId, day }) => {
-        update((current) => ({ ...current, incomes: [...current.incomes, { id: crypto.randomUUID(), name, amount, accountId, expectedOn: day ? dayInPlan(current, day) : '', enabled: true, status: 'expected' }] }))
+    {adding && <OneOffDialog kind="income" plan={plan} accounts={accounts} categories={categories} onClose={() => setAdding(false)}
+      onSave={({ name, amount, accountId, day, category }) => {
+        update((current) => ({ ...current, incomes: [...current.incomes, { id: crypto.randomUUID(), name, amount, accountId, expectedOn: day ? dayInPlan(current, day) : '', enabled: true, status: 'expected', category }] }))
         setAdding(false)
       }} />}
   </Section>

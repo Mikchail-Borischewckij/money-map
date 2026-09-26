@@ -23,7 +23,7 @@ const income = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,
   expectedOn: z.union([z.iso.date(), z.literal('')]), enabled: z.boolean(),
   status: z.enum(['expected', 'included', 'excluded']),
-  recurringIncomeId: uuid.nullable().optional(), amountPending: z.boolean().optional(), checked: z.boolean().optional(),
+  recurringIncomeId: uuid.nullable().optional(), amountPending: z.boolean().optional(), checked: z.boolean().optional(), category: z.string().max(100).optional(),
 })
 const payment = z.object({
   id: uuid, name, amount: moneySchema, accountId: uuid,

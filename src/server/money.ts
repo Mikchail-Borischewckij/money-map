@@ -1,7 +1,7 @@
 // `keepAmount`: what must stay on the account this month (a fee, a reserve); it counts like a payment of the account.
 // `sweepToAccountId`: a business account sends everything above its own payments and `keepAmount` to this account in one transfer.
 export type MoneyAccount = { id: string; name: string; bank?: string; kind: string; openingBalance: number; balanceConfirmed?: boolean; balanceDate?: string | null; canFundTransfers: boolean; priority: number; version?: number; isArchived?: boolean; sweepToAccountId?: string | null; keepAmount?: number }
-export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean; checked?: boolean }
+export type MoneyIncome = { id: string; name: string; amount: number; accountId: string; expectedOn: string; enabled: boolean; status: 'expected' | 'included' | 'excluded'; recurringIncomeId?: string | null; amountPending?: boolean; checked?: boolean; category?: string }
 export type MoneyPayment = { id: string; name: string; amount: number; accountId: string; due: string; enabled: boolean; category: string; recurringPaymentId?: string | null; schedule?: 'monthly' | 'weekly' | null; weekdays?: number[] | null; unitPrice?: number | null; quantity?: number | null; exclusionReason?: string; amountPending?: boolean; checked?: boolean }
 // A transfer already made this month; it keeps its amount whatever the plan says later.
 export type MoneyDoneTransfer = { id: string; fromAccountId: string; toAccountId: string; amount: number }

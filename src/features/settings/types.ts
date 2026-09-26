@@ -9,7 +9,8 @@ export type Template = {
   active_to: string | null; category_id?: string | null; is_archived: boolean; version: number
   schedule?: PaymentSchedule; weekdays?: number[] | null; amount_varies?: boolean
 }
-export type Category = { id: string; name: string; is_archived: boolean; version: number; in_use?: boolean }
+export type CategoryKind = 'payment' | 'income'
+export type Category = { id: string; name: string; kind: CategoryKind; is_archived: boolean; version: number; in_use?: boolean }
 export type TemplateKind = 'payment' | 'income'
 export type TemplateForm = { name: string; amount: number; accountId: string; day: number | null; categoryId: string; schedule: PaymentSchedule; weekdays: number[]; amountVaries: boolean }
 

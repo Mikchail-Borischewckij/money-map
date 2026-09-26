@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { Badge, Button, Dialog } from '@/components/ui'
 import type { MonthPlanState } from '@/hooks/useMonthPlan'
+import type { CategoryNames } from '@/lib/domain'
 import { money, monthName, periodTitle } from '@/lib/format'
 import BalancesDate from './BalancesDate'
 import MonthView from './MonthView'
 import { incomeToCheck, paymentToCheck } from './utils'
 
-export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: string[]; onOpenSettings: () => void }) {
+export default function MonthPage({ month, categories, onOpenSettings }: { month: MonthPlanState; categories: CategoryNames; onOpenSettings: () => void }) {
   const [confirmClose, setConfirmClose] = useState(false)
   const { plan, summary, open, nextMonth } = month
   const liveAccounts = plan.accounts.filter((account) => !account.isArchived)

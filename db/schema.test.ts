@@ -198,3 +198,35 @@ it('stores income checks and made transfers', async () => {
     await pg.close()
   }
 })
+
+it('adds income categories, sorts existing incomes into them and stores a dollar rate per month', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    const files = ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql', '004_single_open_month.sql', '005_income_amount_varies.sql', '006_business_accounts.sql', '007_period_start_day.sql', '008_payment_checked.sql', '009_account_banks.sql', '010_backfill_account_banks.sql', '011_cash_accounts.sql', '012_income_checks_and_done_transfers.sql']
+    for (const file of files) await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    const user = (await pg.query<{ id: string }>("INSERT INTO users (household_id, google_subject, initial_email, email, display_name) VALUES ($1, 'sub', 't@example.com', 't@example.com', 'Тест') RETURNING id", [household])).rows[0].id
+    const account = (await pg.query<{ id: string }>("INSERT INTO accounts (household_id, name) VALUES ($1, 'Основной') RETURNING id", [household])).rows[0].id
+    const [salary, benefit] = (await pg.query<{ id: string }>("INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, active_from) VALUES ($1, 'Зарплата Миши', 100, $2, '2026-09-01'), ($1, '800+', 80000, $2, '2026-09-01') RETURNING id", [household, account])).rows.map((row) => row.id)
+    await pg.query("INSERT INTO income_template_versions (recurring_income_id, effective_from, name, default_amount, account_id) VALUES ($1, '2026-09-01', 'Зарплата Миши', 100, $3), ($2, '2026-09-01', '800+', 80000, $3)", [salary, benefit, account])
+    const plan = (await pg.query<{ id: string }>("INSERT INTO monthly_plans (household_id, year, month, status, created_by, updated_by) VALUES ($1, 2026, 9, 'Finalized', $2, $2) RETURNING id", [household, user])).rows[0].id
+    await pg.query("INSERT INTO monthly_incomes (monthly_plan_id, recurring_income_id, name_snapshot, amount, account_id) VALUES ($1, $2, 'Зарплата Миши', 100, $4), ($1, $3, '800+', 80000, $4), ($1, NULL, 'Подарок', 5000, $4)", [plan, salary, benefit, account])
+
+    const upgrade = await readFile(new URL('./migrations/013_income_categories_and_usd_rate.sql', import.meta.url), 'utf8')
+    await pg.exec(upgrade)
+    await pg.exec(upgrade)
+    expect((await pg.query("SELECT name FROM categories WHERE kind = 'income' ORDER BY display_order")).rows.map((row) => (row as { name: string }).name)).toEqual(['Зарплата', '800+ и пособия', 'Другое'])
+    expect((await pg.query("SELECT COUNT(*)::int AS count FROM categories WHERE kind = 'payment'")).rows).toEqual([{ count: 12 }])
+    expect((await pg.query('SELECT name_snapshot, category_snapshot FROM monthly_incomes ORDER BY amount')).rows).toEqual([
+      { name_snapshot: 'Зарплата Миши', category_snapshot: 'Зарплата' },
+      { name_snapshot: 'Подарок', category_snapshot: '' },
+      { name_snapshot: '800+', category_snapshot: '800+ и пособия' },
+    ])
+    expect((await pg.query('SELECT COUNT(*)::int AS count FROM income_template_versions WHERE category_id IS NULL')).rows).toEqual([{ count: 0 }])
+    await pg.query("UPDATE monthly_plans SET usd_rate = 3.8377, usd_rate_date = '2026-09-30' WHERE id = $1", [plan])
+    expect((await pg.query('SELECT usd_rate::text FROM monthly_plans')).rows).toEqual([{ usd_rate: '3.8377' }])
+    await expect(pg.query('UPDATE monthly_plans SET usd_rate = 0')).rejects.toThrow()
+  } finally {
+    await pg.close()
+  }
+})

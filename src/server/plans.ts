@@ -14,9 +14,9 @@ type Sql = ReturnType<typeof db>
 // Templates in force on the first day of the month, on accounts that are still open. Used both to create a month and to compare it with the directory.
 async function activeTemplates(sql: Sql, householdId: string, first: string) {
   const [incomes, payments] = await Promise.all([
-    sql`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day, i.amount_varies
+    sql`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day, i.amount_varies, COALESCE(c.name, '') AS category
       FROM recurring_incomes i JOIN income_template_versions v ON v.recurring_income_id = i.id
-      JOIN accounts a ON a.id = v.account_id
+      JOIN accounts a ON a.id = v.account_id LEFT JOIN categories c ON c.id = v.category_id
       WHERE i.household_id = ${householdId} AND i.is_archived = false AND a.is_archived = false
       AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
       AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)
@@ -30,7 +30,7 @@ async function activeTemplates(sql: Sql, householdId: string, first: string) {
       ORDER BY p.created_at, p.id`,
   ])
   return {
-    incomes: incomes.map((row): IncomeTemplate => ({ id: row.id, name: row.name, accountId: row.account_id, amount: Number(row.default_amount), day: row.expected_day, varies: row.amount_varies })),
+    incomes: incomes.map((row): IncomeTemplate => ({ id: row.id, name: row.name, category: row.category, accountId: row.account_id, amount: Number(row.default_amount), day: row.expected_day, varies: row.amount_varies })),
     payments: payments.map((row): PaymentTemplate => ({ id: row.id, name: row.name, category: row.category, accountId: row.account_id, amount: Number(row.default_amount), day: row.due_day, schedule: row.schedule, weekdays: row.weekdays, varies: row.amount_varies })),
   }
 }
@@ -163,7 +163,7 @@ export async function readPlan(session: Session, id: string) {
       OR EXISTS (SELECT 1 FROM monthly_transfers t WHERE t.monthly_plan_id = ${id} AND a.id IN (t.from_account_id, t.to_account_id)))
       ORDER BY a.display_order, a.created_at, a.id`,
     db()`SELECT account_id, amount, is_confirmed, balance_date::text, keep_amount_snapshot FROM account_balances WHERE monthly_plan_id = ${id}`,
-    db()`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked FROM monthly_incomes WHERE monthly_plan_id = ${id} ORDER BY id`,
+    db()`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked, category_snapshot FROM monthly_incomes WHERE monthly_plan_id = ${id} ORDER BY id`,
     db()`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled,
       schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
       FROM monthly_payments WHERE monthly_plan_id = ${id} ORDER BY id`,
@@ -184,7 +184,7 @@ export async function readPlan(session: Session, id: string) {
         sweepToAccountId: account.sweep_to_account_id ?? null, keepAmount: Number(balance?.keep_amount_snapshot ?? account.keep_amount ?? 0),
       }
     }),
-    incomes: incomes.map((income) => ({ id: income.id, recurringIncomeId: income.recurring_income_id, name: income.name_snapshot, amount: Number(income.amount), accountId: income.account_id, expectedOn: income.expected_date ?? '', enabled: income.is_enabled, status: income.status === 'Expected' ? 'expected' : income.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: income.amount_pending, checked: income.is_checked })),
+    incomes: incomes.map((income) => ({ id: income.id, recurringIncomeId: income.recurring_income_id, name: income.name_snapshot, amount: Number(income.amount), accountId: income.account_id, expectedOn: income.expected_date ?? '', enabled: income.is_enabled, status: income.status === 'Expected' ? 'expected' : income.status === 'IncludedInOpeningBalance' ? 'included' : 'excluded', amountPending: income.amount_pending, checked: income.is_checked, category: income.category_snapshot })),
     payments: payments.map((payment) => ({ id: payment.id, recurringPaymentId: payment.recurring_payment_id, name: payment.name_snapshot, amount: Number(payment.amount), accountId: payment.account_id, due: payment.due_date ?? whenever, enabled: payment.is_enabled, category: payment.category_snapshot, schedule: payment.schedule_snapshot, weekdays: payment.weekdays_snapshot, unitPrice: payment.unit_price === null ? null : Number(payment.unit_price), quantity: payment.quantity, exclusionReason: payment.exclusion_reason, amountPending: payment.amount_pending, checked: payment.is_checked })),
     allocations: allocations.map((allocation) => ({ id: allocation.id, name: allocation.name, amount: Number(allocation.amount), accountId: allocation.account_id, kind: allocation.type })),
     doneTransfers: done.map((transfer) => ({ id: transfer.id, fromAccountId: transfer.from_account_id, toAccountId: transfer.to_account_id, amount: Number(transfer.amount) })),
@@ -319,7 +319,7 @@ async function resetItem(session: Session, kind: 'payment' | 'income', planId: s
         is_enabled = true, amount_pending = ${Boolean(value.amountPending)}, is_checked = false, version = ${newVersion} WHERE id = ${itemId}`
     } else {
       const value = incomeFromTemplate(period, template as IncomeTemplate, itemId)
-      await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, amount = ${value.amount},
+      await tx`UPDATE monthly_incomes SET name_snapshot = ${value.name}, category_snapshot = ${value.category ?? ''}, amount = ${value.amount},
         account_id = ${value.accountId}, expected_date = ${value.expectedOn || null},
         is_enabled = true, status = 'Expected', amount_pending = ${Boolean(value.amountPending)}, is_checked = false, version = ${newVersion} WHERE id = ${itemId}`
     }

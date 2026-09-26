@@ -461,6 +461,7 @@
 .data-table tbody tr.is-dragging, .dt-card.is-dragging { position: relative; z-index: 1; background: var(--primary-soft); }
 .is-dragging .dt-grip { cursor: grabbing; color: var(--primary); }
 .card-head .segmented { flex-shrink: 0; }
+.card-head-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .actions .row-menu { display: inline-block; }
 
 /* Phone cards */
@@ -492,7 +493,7 @@
 .dt-card-total .dt-card-meta { color: var(--text-2); }
 @media (max-width: 640px) {
   .card-head { flex-direction: row; flex-wrap: wrap; }
-  .card-head .segmented { width: 100%; }
+  .card-head .segmented, .card-head-tools { width: 100%; }
   .card-head .segmented button { flex: 1; }
   .table-toolbar { flex-wrap: nowrap; }
   .table-search { flex-basis: auto; min-width: 0; }

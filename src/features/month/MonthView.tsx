@@ -1,5 +1,5 @@
 import { AccountBadge } from '@/components/ui'
-import type { Plan, PlanSummary } from '@/lib/domain'
+import type { CategoryNames, Plan, PlanSummary } from '@/lib/domain'
 import AllocationSection from './AllocationSection'
 import BalancesSection from './BalancesSection'
 import IncomesSection from './IncomesSection'
@@ -10,7 +10,7 @@ import { readyForTransfers, savingsOf, type MonthActions, type UpdatePlan } from
 
 // One month as steps plus the summary; "Отложить" is a step only when something is set aside. A closed month renders the same layout without inputs.
 export default function MonthView({ plan, summary, readOnly, update, categories, actions, footer }: {
-  plan: Plan; summary: PlanSummary; readOnly: boolean; update: UpdatePlan; categories: string[]
+  plan: Plan; summary: PlanSummary; readOnly: boolean; update: UpdatePlan; categories: CategoryNames
   actions: MonthActions; footer: React.ReactNode
 }) {
   const accountName = (id: string) => plan.accounts.find((account) => account.id === id)?.name ?? 'Счёт удалён'
@@ -21,8 +21,8 @@ export default function MonthView({ plan, summary, readOnly, update, categories,
   return <div className="month-layout">
     <div className="month-sections">
       <BalancesSection plan={plan} readOnly={readOnly} update={update} onOpenSettings={actions.onOpenSettings} />
-      <IncomesSection plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} onReset={actions.onResetIncome} />
-      <PaymentsSection plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} categories={categories} onReset={actions.onResetPayment} />
+      <IncomesSection plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} categories={categories.income} onReset={actions.onResetIncome} />
+      <PaymentsSection plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} categories={categories.payment} onReset={actions.onResetPayment} />
       <AllocationSection plan={plan} step={4} readOnly={readOnly} update={update} accounts={liveAccounts} accountName={accountName} />
       <TransfersSection step={saving ? 5 : 4} summary={summary} accountTag={accountTag} readOnly={readOnly} ready={readyForTransfers(plan)} update={update} />
     </div>

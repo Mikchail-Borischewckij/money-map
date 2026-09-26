@@ -27,7 +27,8 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
   const payload = (value: TemplateForm, version?: number, endedFlag = false) => ({
     name: value.name, defaultAmount: toCents(value.amount), accountId: value.accountId,
     day: value.schedule === 'weekly' ? null : value.day, version, ended: endedFlag,
-    ...(kind === 'payment' ? { categoryId: value.categoryId || null, schedule: value.schedule, weekdays: value.schedule === 'weekly' ? value.weekdays : null } : {}),
+    categoryId: value.categoryId || null,
+    ...(kind === 'payment' ? { schedule: value.schedule, weekdays: value.schedule === 'weekly' ? value.weekdays : null } : {}),
     amountVaries: value.schedule !== 'weekly' && value.amountVaries,
   })
 
@@ -60,8 +61,8 @@ export default function TemplatesTab({ kind, items, accounts, categories, csrfTo
     </span> },
     { key: 'when', header: 'Когда', sort: (item) => item.day ?? (item.schedule === 'weekly' ? 0 : 99), cell: scheduleText },
     { key: 'account', header: 'Счёт', sort: (item) => accountName(item.account_id), filter: { type: 'list', value: (item) => item.account_id, label: accountName }, cell: account },
-    ...(payments ? [{ key: 'category', header: 'Категория', sort: (item: Template) => categoryName(item.category_id) || 'я', filter: { type: 'list' as const, value: (item: Template) => categoryName(item.category_id) },
-      cell: (item: Template) => categoryName(item.category_id) || <span className="muted">Не указана</span> }] : []),
+    { key: 'category', header: 'Категория', sort: (item) => categoryName(item.category_id) || 'я', filter: { type: 'list', value: (item) => categoryName(item.category_id) },
+      cell: (item) => categoryName(item.category_id) || <span className="muted">Не указана</span> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (item) => Number(item.default_amount),
       cell: (item) => <>{money(Number(item.default_amount) / 100)}{item.schedule === 'weekly' && <small> за раз</small>}</> },
     { key: 'actions', header: 'Действия', hideHeader: true, mobile: 'end', className: 'actions', cell: menu },

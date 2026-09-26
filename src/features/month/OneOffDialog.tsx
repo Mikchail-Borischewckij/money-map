@@ -32,7 +32,7 @@ export default function OneOffDialog({ kind, plan, accounts, categories, onClose
       <Field label="Сумма"><MoneyInput label="Сумма" value={amount} onChange={setAmount} /></Field>
       <Field label={kind === 'income' ? 'На счёт' : 'Со счёта'}><Select label="Счёт" value={accountId} options={accounts.map((account) => ({ value: account.id, label: account.name }))} onChange={setAccountId} /></Field>
       <Field label="Когда"><Select label="Когда" value={day} options={dayOptions.slice(0, lastDay + 1)} onChange={setDay} /></Field>
-      {kind === 'payment' && <Field label="Категория"><Select label="Категория" value={category} placeholder="Без категории" options={[{ value: '', label: 'Без категории' }, ...categories.map((item) => ({ value: item, label: item }))]} onChange={setCategory} /></Field>}
+      {categories.length > 0 && <Field label="Категория"><Select label="Категория" value={category} placeholder="Без категории" options={[{ value: '', label: 'Без категории' }, ...categories.map((item) => ({ value: item, label: item }))]} onChange={setCategory} /></Field>}
       {error && <p className="form-error" role="alert">{error}</p>}
       <p className="note field-wide">Действует только в этом месяце. Повторяющиеся операции настраиваются отдельно.</p>
       <button type="submit" hidden />

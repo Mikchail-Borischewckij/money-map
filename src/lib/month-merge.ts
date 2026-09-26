@@ -4,7 +4,7 @@ import type { MoneyIncome, MoneyPayment } from '../server/money'
 // Settings as they apply to one month: the version effective on its first day. Amounts are in grosz.
 // `varies`: the amount changes month to month, so the month gets it as an estimate to check.
 export type PaymentTemplate = { id: string; name: string; category: string; accountId: string; amount: number; day: number | null; schedule: 'monthly' | 'weekly'; weekdays: number[] | null; varies?: boolean }
-export type IncomeTemplate = { id: string; name: string; accountId: string; amount: number; day: number | null; varies: boolean }
+export type IncomeTemplate = { id: string; name: string; category?: string; accountId: string; amount: number; day: number | null; varies: boolean }
 
 export const whenever = 'в течение месяца'
 
@@ -21,7 +21,7 @@ export function paymentFromTemplate(period: Period, template: PaymentTemplate, i
 }
 
 export function incomeFromTemplate(period: Period, template: IncomeTemplate, id: string): MoneyIncome {
-  return { id, recurringIncomeId: template.id, name: template.name, amount: template.amount, accountId: template.accountId, expectedOn: dayInPeriod(period, template.day) ?? '', enabled: true, status: 'expected', amountPending: template.varies }
+  return { id, recurringIncomeId: template.id, name: template.name, category: template.category ?? '', amount: template.amount, accountId: template.accountId, expectedOn: dayInPeriod(period, template.day) ?? '', enabled: true, status: 'expected', amountPending: template.varies }
 }
 
 export type Merge<T> = { value: T; kept: string[] }
@@ -63,8 +63,9 @@ export function mergePayment(period: Period, row: MoneyPayment | null, before: P
   return { value: { ...base, schedule: 'monthly', weekdays: null, unitPrice: null, quantity: null, amount, due, amountPending }, kept }
 }
 
-export function mergeIncome(period: Period, row: MoneyIncome | null, before: IncomeTemplate | null, after: IncomeTemplate, newId: () => string = () => crypto.randomUUID(), beforePeriod: Period = period): Merge<MoneyIncome> {
-  if (!row) return { value: incomeFromTemplate(period, after, newId()), kept: [] }
+export function mergeIncome(period: Period, stored: MoneyIncome | null, before: IncomeTemplate | null, after: IncomeTemplate, newId: () => string = () => crypto.randomUUID(), beforePeriod: Period = period): Merge<MoneyIncome> {
+  if (!stored) return { value: incomeFromTemplate(period, after, newId()), kept: [] }
+  const row = { ...stored, category: stored.category ?? '' }
   const old = before ? incomeFromTemplate(beforePeriod, before, row.id) : null
   const next = incomeFromTemplate(period, after, row.id)
   const kept: string[] = []
@@ -76,5 +77,5 @@ export function mergeIncome(period: Period, row: MoneyIncome | null, before: Inc
   const amount = row.checked ? row.amount : pick('amount', 'сумма')
   if (row.checked && amount !== next.amount) kept.push('сумма')
   const amountPending = !row.checked && pending(after.varies, row.status === 'expected', !old || row.amount === old.amount, row.amountPending, before?.varies)
-  return { value: { ...row, recurringIncomeId: after.id, name: pick('name', 'название'), amount, accountId: pick('accountId', 'счёт'), expectedOn: pick('expectedOn', 'дата'), amountPending }, kept }
+  return { value: { ...row, recurringIncomeId: after.id, name: pick('name', 'название'), category: pick('category', 'категория'), amount, accountId: pick('accountId', 'счёт'), expectedOn: pick('expectedOn', 'дата'), amountPending }, kept }
 }

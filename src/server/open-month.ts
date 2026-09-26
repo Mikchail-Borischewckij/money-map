@@ -18,15 +18,16 @@ export async function lockOpenPlan(tx: Sql, householdId: string): Promise<OpenPl
   return rows[0] ? { id: rows[0].id, year: rows[0].year, month: rows[0].month, startDay: rows[0].start_day, balancesOn: rows[0].balance_date, version: rows[0].version } : null
 }
 
-const incomeTemplate = (row: Record<string, unknown>): IncomeTemplate => ({ id: row.id as string, name: row.name as string, accountId: row.account_id as string, amount: Number(row.default_amount), day: row.expected_day as number | null, varies: Boolean(row.amount_varies) })
+const incomeTemplate = (row: Record<string, unknown>): IncomeTemplate => ({ id: row.id as string, name: row.name as string, category: row.category as string, accountId: row.account_id as string, amount: Number(row.default_amount), day: row.expected_day as number | null, varies: Boolean(row.amount_varies) })
 const paymentTemplate = (row: Record<string, unknown>): PaymentTemplate => ({ id: row.id as string, name: row.name as string, category: row.category as string, accountId: row.account_id as string, amount: Number(row.default_amount), day: row.due_day as number | null, schedule: row.schedule as PaymentTemplate['schedule'], weekdays: row.weekdays as number[] | null, varies: Boolean(row.amount_varies) })
 
 // The settings of one item as they apply to the month, or null when the item is not in force for it.
 export async function templateAt(tx: Sql, kind: Kind, id: string, plan: OpenPlan): Promise<PaymentTemplate | IncomeTemplate | null> {
   const first = `${monthText(plan)}-01`
   if (kind === 'income') {
-    const rows = await tx`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day, i.amount_varies
+    const rows = await tx`SELECT i.id, v.name, v.default_amount, v.account_id, v.expected_day, i.amount_varies, COALESCE(c.name, '') AS category
       FROM recurring_incomes i JOIN income_template_versions v ON v.recurring_income_id = i.id JOIN accounts a ON a.id = v.account_id
+      LEFT JOIN categories c ON c.id = v.category_id
       WHERE i.id = ${id} AND i.is_archived = false AND a.is_archived = false
       AND i.active_from <= ${first}::date AND (i.active_to IS NULL OR i.active_to >= ${first}::date)
       AND v.effective_from <= ${first}::date AND (v.effective_to IS NULL OR v.effective_to >= ${first}::date)`
@@ -48,7 +49,7 @@ async function paymentRow(tx: Sql, planId: string, templateId: string) {
 }
 
 async function incomeRow(tx: Sql, planId: string, templateId: string) {
-  const rows = await tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked
+  const rows = await tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked, category_snapshot
     FROM monthly_incomes WHERE monthly_plan_id = ${planId} AND recurring_income_id = ${templateId} LIMIT 1`
   return rows[0] ? toIncome(rows[0]) : null
 }
@@ -98,7 +99,7 @@ export async function shiftOpenMonth(tx: Sql, session: Session, plan: OpenPlan, 
   const [payments, incomes] = await Promise.all([
     tx`SELECT id, recurring_payment_id, name_snapshot, category_snapshot, amount, account_id, due_date::text, is_enabled, schedule_snapshot, weekdays_snapshot, unit_price, quantity, exclusion_reason, amount_pending, is_checked
       FROM monthly_payments WHERE monthly_plan_id = ${plan.id}`,
-    tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked FROM monthly_incomes WHERE monthly_plan_id = ${plan.id}`,
+    tx`SELECT id, recurring_income_id, name_snapshot, amount, account_id, expected_date::text, is_enabled, status, amount_pending, is_checked, category_snapshot FROM monthly_incomes WHERE monthly_plan_id = ${plan.id}`,
   ])
   const redate = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) ? dayInPeriod(after, Number(date.slice(8, 10))) : null
   const nextPayments = await Promise.all(payments.map(toPayment).map(async (row) => {

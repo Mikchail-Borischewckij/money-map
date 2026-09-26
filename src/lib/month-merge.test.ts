@@ -60,6 +60,15 @@ describe('settings changes in the open month', () => {
     expect(kept).toEqual(['сумма'])
   })
 
+  it('carries a new income category into the month and fills it in for months saved without one', () => {
+    const withCategory = { ...salary, category: 'Зарплата' }
+    expect(mergeIncome(month, salaryRow, salary, withCategory).value.category).toBe('Зарплата')
+    expect(mergeIncome(month, { ...salaryRow, category: 'Зарплата' }, withCategory, { ...withCategory, category: 'Пособия' }).value.category).toBe('Пособия')
+    const { value, kept } = mergeIncome(month, { ...salaryRow, category: 'Другое' }, withCategory, { ...withCategory, category: 'Пособия' })
+    expect(value.category).toBe('Другое')
+    expect(kept).toEqual(['категория'])
+  })
+
   it('marks a varying income as an estimate in a new month', () => {
     const { value } = mergeIncome(month, null, null, { ...salary, varies: true }, () => 'i2')
     expect(value).toMatchObject({ id: 'i2', amount: 900000, amountPending: true })

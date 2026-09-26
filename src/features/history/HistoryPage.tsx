@@ -29,7 +29,7 @@ export default function HistoryPage() {
   if (viewing) return <div className="page">
     <button type="button" className="link back" onClick={() => setViewing(null)}><ArrowLeft size={16} />История</button>
     <header className="page-head"><div className="page-title"><h1>{periodTitle(viewing.plan.month, viewing.plan.startDay)}</h1><Badge>Закрыт</Badge></div></header>
-    <MonthView plan={toUiPlan(viewing.plan)} summary={toUiSummary(viewing.summary)} readOnly categories={[]} actions={noActions} update={() => undefined} footer={null} />
+    <MonthView plan={toUiPlan(viewing.plan)} summary={toUiSummary(viewing.summary)} readOnly categories={{ payment: [], income: [] }} actions={noActions} update={() => undefined} footer={null} />
   </div>
 
   return <div className="page">

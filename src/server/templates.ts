@@ -41,7 +41,7 @@ export async function settingsWindow(session: Session) {
 }
 
 export async function listTemplates(session: Session, kind: TemplateKind) {
-  if (kind === 'income') return db()`SELECT i.id, i.name, i.default_amount, i.account_id, i.expected_day AS day, i.amount_varies,
+  if (kind === 'income') return db()`SELECT i.id, i.name, i.default_amount, i.account_id, i.expected_day AS day, i.category_id, i.amount_varies,
     i.active_from::text, i.active_to::text, i.is_archived, i.version, v.effective_from::text AS latest_effective_from
     FROM recurring_incomes i JOIN LATERAL (SELECT effective_from FROM income_template_versions
       WHERE recurring_income_id = i.id ORDER BY effective_from DESC LIMIT 1) v ON true
@@ -53,16 +53,16 @@ export async function listTemplates(session: Session, kind: TemplateKind) {
     WHERE p.household_id = ${session.householdId} ORDER BY p.name`
 }
 
-async function referencesValid(session: Session, value: TemplateValue) {
+async function referencesValid(session: Session, kind: TemplateKind, value: TemplateValue) {
   const [account, category] = await Promise.all([
     db()`SELECT id FROM accounts WHERE id = ${value.accountId} AND household_id = ${session.householdId} AND is_archived = false`,
-    value.categoryId ? db()`SELECT id FROM categories WHERE id = ${value.categoryId} AND household_id = ${session.householdId} AND is_archived = false` : Promise.resolve([true]),
+    value.categoryId ? db()`SELECT id FROM categories WHERE id = ${value.categoryId} AND household_id = ${session.householdId} AND kind = ${kind} AND is_archived = false` : Promise.resolve([true]),
   ])
   return Boolean(account[0] && category[0])
 }
 
 export async function createTemplate(session: Session, kind: TemplateKind, input: TemplateValue) {
-  const [valid, window] = await Promise.all([referencesValid(session, input), settingsWindow(session)])
+  const [valid, window] = await Promise.all([referencesValid(session, kind, input), settingsWindow(session)])
   if (!valid) return null
   const value = { ...input, activeFrom: window.effectiveFrom, activeTo: input.ended ? window.endDate : null }
   if (value.activeTo && value.activeTo < value.activeFrom) return null
@@ -70,10 +70,10 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
     const tx = transaction as unknown as Sql
     const plan = await lockOpenPlan(tx, session.householdId)
     if (kind === 'income') {
-      const rows = await tx`INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, expected_day, active_from, active_to, amount_varies)
-        VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.activeFrom}, ${value.activeTo}, ${value.amountVaries ?? false}) RETURNING *`
-      await tx`INSERT INTO income_template_versions (recurring_income_id, effective_from, name, default_amount, account_id, expected_day)
-        VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
+      const rows = await tx`INSERT INTO recurring_incomes (household_id, name, default_amount, account_id, expected_day, category_id, active_from, active_to, amount_varies)
+        VALUES (${session.householdId}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day}, ${value.categoryId ?? null}, ${value.activeFrom}, ${value.activeTo}, ${value.amountVaries ?? false}) RETURNING *`
+      await tx`INSERT INTO income_template_versions (recurring_income_id, effective_from, name, category_id, default_amount, account_id, expected_day)
+        VALUES (${rows[0].id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
       await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
         VALUES (${session.householdId}, ${session.userId}, 'RecurringIncome', ${rows[0].id}, 'create', 1)`
       return { ...rows[0], monthNote: await applyToOpenMonth(tx, session, kind, rows[0].id, plan, null) }
@@ -93,7 +93,7 @@ export async function createTemplate(session: Session, kind: TemplateKind, input
 export async function updateTemplate(session: Session, kind: TemplateKind, id: string, input: TemplateValue) {
   const version = input.version
   if (!version) return null
-  const [valid, window] = await Promise.all([referencesValid(session, input), settingsWindow(session)])
+  const [valid, window] = await Promise.all([referencesValid(session, kind, input), settingsWindow(session)])
   if (!valid) return null
   return db().begin(async (transaction) => {
     const tx = transaction as unknown as Sql
@@ -115,13 +115,13 @@ export async function updateTemplate(session: Session, kind: TemplateKind, id: s
     if (kind === 'income') {
       if (value.activeFrom > latest[0].effective_from) {
         await tx`UPDATE income_template_versions SET effective_to = (${value.activeFrom}::date - 1) WHERE id = ${latest[0].id}`
-        await tx`INSERT INTO income_template_versions (recurring_income_id, effective_from, name, default_amount, account_id, expected_day)
-          VALUES (${id}, ${value.activeFrom}, ${value.name}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
+        await tx`INSERT INTO income_template_versions (recurring_income_id, effective_from, name, category_id, default_amount, account_id, expected_day)
+          VALUES (${id}, ${value.activeFrom}, ${value.name}, ${value.categoryId ?? null}, ${value.defaultAmount}, ${value.accountId}, ${value.day})`
       } else {
-        await tx`UPDATE income_template_versions SET name = ${value.name}, default_amount = ${value.defaultAmount},
+        await tx`UPDATE income_template_versions SET name = ${value.name}, category_id = ${value.categoryId ?? null}, default_amount = ${value.defaultAmount},
           account_id = ${value.accountId}, expected_day = ${value.day} WHERE id = ${latest[0].id}`
       }
-      const rows = await tx`UPDATE recurring_incomes SET name = ${value.name}, default_amount = ${value.defaultAmount},
+      const rows = await tx`UPDATE recurring_incomes SET name = ${value.name}, category_id = ${value.categoryId ?? null}, default_amount = ${value.defaultAmount},
         account_id = ${value.accountId}, expected_day = ${value.day}, active_to = ${value.activeTo}, amount_varies = ${value.amountVaries ?? false},
         version = version + 1, updated_at = now() WHERE id = ${id} RETURNING *`
       await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)

@@ -7,6 +7,7 @@ import MonthPage from '@/features/month/MonthPage'
 import SettingsPage from '@/features/settings/SettingsPage'
 import { useMonthPlan } from '@/hooks/useMonthPlan'
 import type { ServerRecord } from '@/lib/api-client'
+import type { CategoryNames } from '@/lib/domain'
 import Sidebar from './layout/Sidebar'
 import TabBar from './layout/TabBar'
 import type { View } from './layout/nav'
@@ -14,10 +15,13 @@ import type { View } from './layout/nav'
 export default function App({ initial, nextMonth, csrfToken, displayName }: { initial: ServerRecord; nextMonth: string | null; csrfToken: string; displayName: string }) {
   const month = useMonthPlan({ initial, initialNext: nextMonth, csrfToken })
   const [view, setView] = useState<View>('month')
-  const [categories, setCategories] = useState<string[]>([])
+  const [categories, setCategories] = useState<CategoryNames>({ payment: [], income: [] })
 
   const loadCategories = useCallback(() => fetch('/api/categories', { cache: 'no-store' }).then((response) => response.ok ? response.json() : [])
-    .then((rows: { name: string; is_archived: boolean }[]) => setCategories(rows.filter((row) => !row.is_archived).map((row) => row.name))).catch(() => undefined), [])
+    .then((rows: { name: string; kind: 'payment' | 'income'; is_archived: boolean }[]) => {
+      const names = (kind: string) => rows.filter((row) => !row.is_archived && row.kind === kind).map((row) => row.name)
+      setCategories({ payment: names('payment'), income: names('income') })
+    }).catch(() => undefined), [])
   useEffect(() => { void loadCategories() }, [loadCategories])
 
   async function logout() {

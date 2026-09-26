@@ -126,3 +126,6 @@ export const isBusiness = (account: Pick<Account, 'kind'>) => account.kind === '
 
 // The same calculation as on the server, in grosz, so the screen and the saved month always agree.
 export const calculatePlan = (plan: Plan): PlanSummary => toUiSummary(calculateMoneyPlan(toApiPlan(plan)))
+
+// Names of the categories in use, for the month's one-off dialogs.
+export type CategoryNames = { payment: string[]; income: string[] }

@@ -45,8 +45,8 @@ export default function SettingsPage({ csrfToken, onChanged }: { csrfToken: stri
     {message && <p className="toast" role="status">{message}</p>}
     {error && <p className="toast toast-error" role="alert">{error}</p>}
     {tab === 'accounts' && <AccountsTab accounts={lists.accounts} csrfToken={csrfToken} run={run} />}
-    {tab === 'payments' && <TemplatesTab kind="payment" items={lists.payments} accounts={lists.accounts} categories={lists.categories} csrfToken={csrfToken} run={run} />}
-    {tab === 'incomes' && <TemplatesTab kind="income" items={lists.incomes} accounts={lists.accounts} categories={lists.categories} csrfToken={csrfToken} run={run} />}
+    {tab === 'payments' && <TemplatesTab kind="payment" items={lists.payments} accounts={lists.accounts} categories={lists.categories.filter((category) => category.kind === 'payment')} csrfToken={csrfToken} run={run} />}
+    {tab === 'incomes' && <TemplatesTab kind="income" items={lists.incomes} accounts={lists.accounts} categories={lists.categories.filter((category) => category.kind === 'income')} csrfToken={csrfToken} run={run} />}
     {tab === 'period' && <PeriodTab startDay={lists.periodStartDay} csrfToken={csrfToken} run={run} />}
     {tab === 'categories' && <CategoriesTab categories={lists.categories} csrfToken={csrfToken} run={run} />}
   </div>
