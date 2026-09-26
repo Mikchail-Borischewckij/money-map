@@ -6,7 +6,7 @@ import { accountInput } from '@/server/validation'
 export async function GET() {
   const session = await getSession()
   if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401, headers: privateHeaders })
-  const rows = await db()`SELECT id, name, type AS kind, display_order, can_fund_transfers, transfer_priority, is_archived, version, sweep_to_account_id, keep_amount
+  const rows = await db()`SELECT id, name, bank, type AS kind, display_order, can_fund_transfers, transfer_priority, is_archived, version, sweep_to_account_id, keep_amount
     FROM accounts WHERE household_id = ${session.householdId} ORDER BY display_order, id`
   return Response.json(rows, { headers: privateHeaders })
 }
@@ -20,8 +20,8 @@ export async function POST(request: Request) {
   const value = await accountFields(session, parsed.data)
   if (!value) return Response.json({ error: 'Invalid account' }, { status: 400, headers: privateHeaders })
   const rows = await db().begin(async (tx) => {
-    const created = await tx`INSERT INTO accounts (household_id, name, type, can_fund_transfers, transfer_priority, sweep_to_account_id, keep_amount, display_order)
-      VALUES (${session.householdId}, ${value.name}, ${value.kind}, ${value.canFundTransfers}, ${value.priority}, ${value.sweepToAccountId}, ${value.keepAmount},
+    const created = await tx`INSERT INTO accounts (household_id, name, bank, type, can_fund_transfers, transfer_priority, sweep_to_account_id, keep_amount, display_order)
+      VALUES (${session.householdId}, ${value.name}, ${value.bank}, ${value.kind}, ${value.canFundTransfers}, ${value.priority}, ${value.sweepToAccountId}, ${value.keepAmount},
       (SELECT COALESCE(MAX(display_order), 0) + 1 FROM accounts WHERE household_id = ${session.householdId})) RETURNING *`
     await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, new_version)
       VALUES (${session.householdId}, ${session.userId}, 'Account', ${created[0].id}, 'create', 1)`

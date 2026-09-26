@@ -17,7 +17,7 @@ export async function PUT(request: Request, context: Context) {
   const value = await accountFields(session, parsed.data, id)
   if (!value) return Response.json({ error: 'Invalid account' }, { status: 400, headers: privateHeaders })
   const updated = await db().begin(async (tx) => {
-    const rows = await tx`UPDATE accounts SET name = ${value.name}, type = ${value.kind}, can_fund_transfers = ${value.canFundTransfers},
+    const rows = await tx`UPDATE accounts SET name = ${value.name}, bank = ${value.bank}, type = ${value.kind}, can_fund_transfers = ${value.canFundTransfers},
       transfer_priority = ${value.priority}, sweep_to_account_id = ${value.sweepToAccountId}, keep_amount = ${value.keepAmount}, version = version + 1, updated_at = now()
       WHERE id = ${id} AND household_id = ${session.householdId} AND version = ${value.version} AND is_archived = false RETURNING *`
     if (rows[0]) await tx`INSERT INTO audit_events (household_id, actor_id, entity_type, entity_id, action, old_version, new_version)
@@ -25,7 +25,7 @@ export async function PUT(request: Request, context: Context) {
     return rows[0]
   })
   if (updated) return Response.json(updated, { headers: privateHeaders })
-  const current = await db()`SELECT id, name, type, can_fund_transfers, transfer_priority, version FROM accounts
+  const current = await db()`SELECT id, name, bank, type, can_fund_transfers, transfer_priority, version FROM accounts
     WHERE id = ${id} AND household_id = ${session.householdId}`
   return Response.json(current[0] ? { error: 'Version conflict', current: current[0] } : { error: 'Not found' }, { status: current[0] ? 409 : 404, headers: privateHeaders })
 }

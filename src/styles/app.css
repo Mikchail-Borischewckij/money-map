@@ -324,3 +324,107 @@
 .onboarding { display: grid; gap: 14px; justify-items: start; max-width: 560px; padding: 28px; }
 .onboarding h2 { font-size: 20px; letter-spacing: -0.3px; }
 .onboarding ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--text-2); }
+
+/* Calm, data-first interface */
+.shell { grid-template-columns: 216px minmax(0, 1fr); }
+.sidebar { gap: 24px; padding: 22px 12px; }
+.brand-mark { border-radius: 8px; background: var(--text); }
+.main { padding: 28px 32px 56px; }
+.page { max-width: 1320px; gap: 18px; }
+.page-head h1 { font-size: 26px; letter-spacing: -0.45px; }
+.card { min-width: 0; padding: 18px 20px; box-shadow: none; }
+.card-head { margin-bottom: 0; }
+.card-head p { max-width: 640px; line-height: 1.45; }
+.section-head { margin-bottom: 8px; }
+.step { background: transparent; border: 1px solid var(--border-strong); color: var(--muted); }
+.step.is-done { background: var(--text); border-color: var(--text); }
+.badge { border-radius: 6px; font-weight: 500; }
+.summary-hero, .summary-hero.is-short { padding: 20px; background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
+.summary-hero span { color: var(--muted); opacity: 1; }
+.summary-hero strong { font-size: 32px; }
+.summary-hero.is-short strong { color: var(--danger); }
+.summary-hero .badge { background: var(--warn-soft); color: var(--warn); }
+.summary-lines { padding-top: 16px; padding-bottom: 16px; }
+.summary-lines div { align-items: baseline; }
+.next-month { background: var(--surface); border-color: var(--border); }
+
+/* Bank identity replaces decorative account pills. */
+.bank-logo { display: inline-flex; align-items: center; gap: 9px; min-width: 0; max-width: 100%; color: var(--text); vertical-align: middle; }
+.bank-logo-mark { display: grid; place-items: center; flex: 0 0 auto; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 11px; font-weight: 800; letter-spacing: -0.3px; }
+.bank-logo-copy { display: grid; min-width: 0; line-height: 1.15; text-align: left; }
+.bank-logo-name { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.bank-logo-copy small { overflow: hidden; margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.bank-logo-pko .bank-logo-mark { border-color: #d71920; color: #d71920; }
+.bank-logo-credit-agricole .bank-logo-mark { border-color: #398b3d; color: #246b31; }
+.bank-logo-revolut .bank-logo-mark { border-color: #171a1d; background: #171a1d; color: #fff; }
+.bank-logo-other .bank-logo-mark { color: var(--muted); }
+.account-badge { all: unset; }
+
+/* Controls sit in a separate band above tables. */
+.table-toolbar { display: flex; align-items: center; gap: 8px; margin: 16px 0 12px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.table-search { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; min-width: 160px; height: 38px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); }
+.table-search:focus-within { border-color: var(--primary); box-shadow: var(--focus); }
+.table-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; }
+.table-toolbar .select-compact { flex: 0 1 190px; width: 190px; }
+.table-toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.table-toolbar-actions .select-compact { width: 180px; }
+.table-scroll { max-width: 100%; margin: 0; padding: 0 0 8px; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.data-table, .money-table { min-width: 720px; }
+.compact-table { min-width: 520px; }
+.data-table thead th, .money-table thead th { height: 38px; color: var(--muted); font-size: 11px; letter-spacing: .4px; }
+.data-table tbody tr:hover, .money-table tbody tr:hover { background: var(--surface-2); }
+.data-table th, .data-table td, .money-table th, .money-table td { padding-top: 12px; padding-bottom: 12px; }
+.money-table .is-in { color: #11734b; }
+.money-table .is-out { color: var(--danger); }
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.pagination > div { display: flex; align-items: center; gap: 6px; }
+.category-add { max-width: 540px; margin-top: 16px; padding-bottom: 4px; }
+.inline-add .text-input { background: var(--surface); }
+.segmented { background: var(--surface-2); border: 1px solid var(--border); }
+.segmented button.is-active { color: var(--text); }
+.btn { border-radius: 8px; }
+.btn-primary { box-shadow: 0 1px 1px rgb(0 0 0 / 8%); }
+
+@media (max-width: 860px) {
+  .main { padding: 18px 16px 92px; }
+  .page { gap: 14px; }
+  .month-summary { order: -1; }
+  .summary { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(260px, 1.2fr); }
+  .summary-hero { border-right: 1px solid var(--border); border-bottom: 0; }
+  .summary-lines { border-bottom: 0; }
+  .summary-foot { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+  .main { padding: 14px 12px 90px; }
+  .page-head { align-items: flex-start; }
+  .page-head h1 { font-size: 22px; }
+  .card { padding: 15px; }
+  .section-head { align-items: flex-start; flex-wrap: nowrap; }
+  .section-title h2 { font-size: 17px; }
+  .section-meta { flex-basis: 100%; }
+  .summary { display: block; }
+  .summary-hero { border-right: 0; border-bottom: 1px solid var(--border); }
+  .summary-hero strong { font-size: 28px; }
+  .table-toolbar { align-items: stretch; flex-wrap: wrap; padding: 8px; }
+  .table-search { flex-basis: 100%; }
+  .table-toolbar .select-compact, .table-toolbar-actions, .table-toolbar-actions .select-compact { flex: 1 1 150px; width: auto; }
+  .table-toolbar-actions { flex-wrap: wrap; margin-left: 0; }
+  .table-toolbar-actions .btn { flex: 1 0 auto; }
+  .table-scroll { overscroll-behavior-x: contain; }
+  .data-table, .money-table { min-width: 700px; }
+  .compact-table { min-width: 520px; }
+  .data-table .col-opt { display: table-cell; }
+  .cell-sub { display: none; }
+  .data-table th, .data-table td { padding-left: 9px; padding-right: 9px; }
+  .row { padding: 12px 0; }
+  .page > .segmented { width: 100%; justify-self: stretch; }
+  .page > .segmented button { flex: 1 0 auto; }
+  .inline-add { flex-wrap: wrap; }
+  .inline-add .text-input { min-width: 180px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .bank-logo-revolut .bank-logo-mark { border-color: #fff; background: #fff; color: #171a1d; }
+  .money-table .is-in { color: #78d8ac; }
+}

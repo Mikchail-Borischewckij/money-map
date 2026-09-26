@@ -1,8 +1,9 @@
 import type { Option } from '@/components/ui'
+import type { BankId } from '@/lib/banks'
 import type { PaymentSchedule } from '@/lib/schedule'
 
 export type AccountKind = 'current' | 'savings' | 'cash' | 'business'
-export type AccountRow = { id: string; name: string; kind: AccountKind; can_fund_transfers: boolean; transfer_priority: number; is_archived: boolean; version: number; sweep_to_account_id?: string | null; keep_amount?: string | number }
+export type AccountRow = { id: string; name: string; bank: BankId; kind: AccountKind; can_fund_transfers: boolean; transfer_priority: number; is_archived: boolean; version: number; sweep_to_account_id?: string | null; keep_amount?: string | number }
 export type Template = {
   id: string; name: string; default_amount: string; account_id: string; day: number | null
   active_to: string | null; category_id?: string | null; is_archived: boolean; version: number

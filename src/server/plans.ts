@@ -118,8 +118,8 @@ async function insertPlan(tx: Sql, session: Session, year: number, month: number
   const { incomes, payments } = await activeTemplates(tx, session.householdId, `${period.month}-01`)
   await Promise.all([
     tx`INSERT INTO account_balances
-      (monthly_plan_id, account_id, amount, is_confirmed, name_snapshot, type_snapshot, can_fund_transfers_snapshot, transfer_priority_snapshot, sweep_to_snapshot, keep_amount_snapshot)
-      SELECT ${planId}, id, 0, false, name, type, can_fund_transfers, transfer_priority, sweep_to_account_id, keep_amount
+      (monthly_plan_id, account_id, amount, is_confirmed, name_snapshot, bank_snapshot, type_snapshot, can_fund_transfers_snapshot, transfer_priority_snapshot, sweep_to_snapshot, keep_amount_snapshot)
+      SELECT ${planId}, id, 0, false, name, bank, type, can_fund_transfers, transfer_priority, sweep_to_account_id, keep_amount
       FROM accounts WHERE household_id = ${session.householdId} AND is_archived = false`,
     insertIncomes(tx, planId, 1, incomes.map((income) => incomeFromTemplate(period, income, crypto.randomUUID()))),
     insertPayments(tx, planId, 1, payments.map((payment) => paymentFromTemplate(period, payment, crypto.randomUUID()))),
@@ -169,13 +169,14 @@ export async function readPlan(session: Session, id: string) {
   const [accounts, balances, incomes, payments, allocations] = await Promise.all([
     // An open month follows the account settings; a closed month keeps the names and settings it was closed with.
     open
-      ? db()`SELECT a.id, a.name, a.type, a.can_fund_transfers, a.transfer_priority, a.display_order, a.version, a.is_archived, a.sweep_to_account_id, a.keep_amount
+      ? db()`SELECT a.id, a.name, a.bank, a.type, a.can_fund_transfers, a.transfer_priority, a.display_order, a.version, a.is_archived, a.sweep_to_account_id, a.keep_amount
         FROM accounts a WHERE a.household_id = ${session.householdId} AND (a.is_archived = false
         OR EXISTS (SELECT 1 FROM monthly_incomes i WHERE i.monthly_plan_id = ${id} AND i.account_id = a.id)
         OR EXISTS (SELECT 1 FROM monthly_payments p WHERE p.monthly_plan_id = ${id} AND p.account_id = a.id)
         OR EXISTS (SELECT 1 FROM allocations l WHERE l.monthly_plan_id = ${id} AND l.account_id = a.id))
         ORDER BY a.display_order, a.created_at, a.id`
       : db()`SELECT a.id, COALESCE(b.name_snapshot, a.name) AS name,
+      COALESCE(b.bank_snapshot, a.bank) AS bank,
       COALESCE(b.type_snapshot, a.type) AS type,
       COALESCE(b.can_fund_transfers_snapshot, a.can_fund_transfers) AS can_fund_transfers,
       COALESCE(b.transfer_priority_snapshot, a.transfer_priority) AS transfer_priority,
@@ -202,7 +203,7 @@ export async function readPlan(session: Session, id: string) {
     accounts: accounts.map((account) => {
       const balance = balanceMap.get(account.id)
       return {
-        id: account.id, name: account.name, kind: account.type, openingBalance: balance ? Number(balance.amount) : 0, balanceConfirmed: Boolean(balance?.is_confirmed), balanceDate: balance?.balance_date ?? null,
+        id: account.id, name: account.name, bank: account.bank, kind: account.type, openingBalance: balance ? Number(balance.amount) : 0, balanceConfirmed: Boolean(balance?.is_confirmed), balanceDate: balance?.balance_date ?? null,
         canFundTransfers: account.can_fund_transfers, priority: account.transfer_priority, version: account.version, isArchived: account.is_archived,
         sweepToAccountId: account.sweep_to_account_id ?? null, keepAmount: Number(account.keep_amount ?? 0),
       }
@@ -223,7 +224,7 @@ export async function savePlan(session: Session, id: string, value: unknown) {
     const tx = transaction as unknown as Sql
     const [current, allowed, incomeTemplates, paymentTemplates] = await Promise.all([
       tx`SELECT version, status, year, month, start_day FROM monthly_plans WHERE id = ${id} AND household_id = ${session.householdId} FOR UPDATE`,
-      tx`SELECT id, type, sweep_to_account_id, keep_amount FROM accounts WHERE household_id = ${session.householdId}`,
+      tx`SELECT id, bank, type, sweep_to_account_id, keep_amount FROM accounts WHERE household_id = ${session.householdId}`,
       tx`SELECT id FROM recurring_incomes WHERE household_id = ${session.householdId}`,
       tx`SELECT id FROM recurring_payments WHERE household_id = ${session.householdId}`,
     ])
@@ -248,8 +249,8 @@ export async function savePlan(session: Session, id: string, value: unknown) {
       tx`DELETE FROM monthly_incomes WHERE monthly_plan_id = ${id}`,
       tx`DELETE FROM monthly_payments WHERE monthly_plan_id = ${id}`,
       tx`DELETE FROM allocations WHERE monthly_plan_id = ${id}`,
-      tx`INSERT INTO account_balances (monthly_plan_id, account_id, amount, balance_date, is_confirmed, name_snapshot, type_snapshot, can_fund_transfers_snapshot, transfer_priority_snapshot, sweep_to_snapshot, keep_amount_snapshot)
-        SELECT ${id}, a.id, x.amount, x.balance_date, x.is_confirmed, a.name, a.type, a.can_fund_transfers, a.transfer_priority, a.sweep_to_account_id, a.keep_amount
+      tx`INSERT INTO account_balances (monthly_plan_id, account_id, amount, balance_date, is_confirmed, name_snapshot, bank_snapshot, type_snapshot, can_fund_transfers_snapshot, transfer_priority_snapshot, sweep_to_snapshot, keep_amount_snapshot)
+        SELECT ${id}, a.id, x.amount, x.balance_date, x.is_confirmed, a.name, a.bank, a.type, a.can_fund_transfers, a.transfer_priority, a.sweep_to_account_id, a.keep_amount
         FROM jsonb_to_recordset(${json(balances)}::text::jsonb) AS x(account_id uuid, amount bigint, balance_date date, is_confirmed boolean)
         JOIN accounts a ON a.id = x.account_id AND a.household_id = ${session.householdId}`,
       insertIncomes(tx, id, newVersion, plan.incomes),
@@ -294,7 +295,7 @@ export async function changePlanStatus(session: Session, id: string, action: 'fi
         OR EXISTS (SELECT 1 FROM monthly_payments WHERE monthly_plan_id = ${id} AND is_enabled AND NOT is_checked)
       ) AS missing, (SELECT COUNT(*) FROM account_balances WHERE monthly_plan_id = ${id}) AS account_count`
       if (incomplete[0].missing || Number(incomplete[0].account_count) === 0) return 'incomplete'
-      await tx`UPDATE account_balances b SET name_snapshot = a.name, type_snapshot = a.type,
+      await tx`UPDATE account_balances b SET name_snapshot = a.name, bank_snapshot = a.bank, type_snapshot = a.type,
         can_fund_transfers_snapshot = a.can_fund_transfers, transfer_priority_snapshot = a.transfer_priority,
         sweep_to_snapshot = a.sweep_to_account_id, keep_amount_snapshot = a.keep_amount
         FROM accounts a WHERE b.account_id = a.id AND b.monthly_plan_id = ${id}`

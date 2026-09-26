@@ -4,10 +4,12 @@ export const moneySchema = z.number().int().min(0).max(9_000_000_000_000)
 export const uuid = z.string().uuid()
 const name = z.string().trim().min(1).max(160)
 const accountKind = z.enum(['current', 'savings', 'cash', 'business'])
+const bank = z.enum(['pko', 'credit-agricole', 'revolut', 'other'])
 const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7).refine((days) => new Set(days).size === days.length, { message: 'Duplicate weekday' })
 
 export const accountInput = z.object({
   name,
+  bank,
   kind: accountKind,
   canFundTransfers: z.boolean(),
   priority: z.number().int().min(0).max(10000),
@@ -39,7 +41,7 @@ export const planInput = z.object({
   expectedVersion: z.number().int().positive(),
   plan: z.object({
     month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), startDay: z.number().int().min(1).max(28).optional(), balancesOn: z.iso.date().nullable().optional(),
-    accounts: z.array(z.object({ id: uuid, name, kind: accountKind, openingBalance: moneySchema, balanceConfirmed: z.boolean().optional(), balanceDate: z.iso.date().nullable().optional(), canFundTransfers: z.boolean(), priority: z.number().int().min(0).max(10000), sweepToAccountId: uuid.nullable().optional(), keepAmount: moneySchema.optional() })),
+    accounts: z.array(z.object({ id: uuid, name, bank: bank.optional(), kind: accountKind, openingBalance: moneySchema, balanceConfirmed: z.boolean().optional(), balanceDate: z.iso.date().nullable().optional(), canFundTransfers: z.boolean(), priority: z.number().int().min(0).max(10000), sweepToAccountId: uuid.nullable().optional(), keepAmount: moneySchema.optional() })),
     incomes: z.array(income), payments: z.array(payment), allocations: z.array(allocation),
   }),
 }).superRefine((value, context) => {

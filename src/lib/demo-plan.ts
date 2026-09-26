@@ -3,11 +3,11 @@ import type { Plan } from './domain'
 export const demoPlan: Plan = {
   month: '2026-10',
   accounts: [
-    { id: 'main', name: 'Основной счёт', kind: 'current', openingBalance: 0, canFundTransfers: true, priority: 1 },
-    { id: 'bills', name: 'Счёт для платежей', kind: 'current', openingBalance: 200, canFundTransfers: false, priority: 2 },
-    { id: 'card', name: 'Дополнительная карта', kind: 'current', openingBalance: 100, canFundTransfers: false, priority: 3 },
-    { id: 'daily', name: 'На каждый день', kind: 'current', openingBalance: 0, canFundTransfers: false, priority: 4 },
-    { id: 'savings', name: 'Накопления', kind: 'savings', openingBalance: 0, canFundTransfers: false, priority: 5 },
+    { id: 'main', name: 'Основной счёт', bank: 'pko', kind: 'current', openingBalance: 0, canFundTransfers: true, priority: 1 },
+    { id: 'bills', name: 'Платежи', bank: 'credit-agricole', kind: 'current', openingBalance: 200, canFundTransfers: false, priority: 2 },
+    { id: 'card', name: 'Дополнительная карта', bank: 'revolut', kind: 'current', openingBalance: 100, canFundTransfers: false, priority: 3 },
+    { id: 'daily', name: 'На каждый день', bank: 'pko', kind: 'current', openingBalance: 0, canFundTransfers: false, priority: 4 },
+    { id: 'savings', name: 'Накопления', bank: 'credit-agricole', kind: 'savings', openingBalance: 0, canFundTransfers: false, priority: 5 },
   ],
   incomes: [
     { id: 'salary', name: 'Основной доход', amount: 12000, accountId: 'main', expectedOn: '2026-10-01', enabled: true, status: 'expected' },

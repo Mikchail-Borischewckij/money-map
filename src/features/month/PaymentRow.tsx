@@ -41,7 +41,7 @@ export default function PaymentRow({ payment, period, readOnly, accountTag, onCh
   ]
   return <tr>
     <td>
-      <span className="cell-name">{payment.name}<Attention reasons={[...(toCheck ? ['Сумма — оценка из настроек: впишите точную и отметьте «Проверено»'] : []), ...(past ? ['Дата раньше остатков: возможно, уже оплачен — см. меню'] : [])]} /></span>
+      <span className="cell-name">{payment.name}<Attention reasons={[...(toCheck ? ['Укажите точную сумму и подтвердите платёж'] : []), ...(past ? ['Дата раньше даты остатков. Платёж может быть уже учтён'] : [])]} /></span>
       {sub}
     </td>
     <td className="col-opt">{accountTag(payment.accountId)}</td>

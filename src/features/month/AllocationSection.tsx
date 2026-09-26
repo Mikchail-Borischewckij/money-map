@@ -18,7 +18,7 @@ export default function AllocationSection({ plan, step, readOnly, update, accoun
   return <Section step={step} title="Отложить" action={!readOnly && <Button size="sm" variant="ghost" onClick={remove}>Не откладывать</Button>}>
     <div className="rows">
       <div className="row">
-        <div className="row-main"><strong>{readOnly ? accountName(value.accountId) : 'На счёт'}</strong><span className="row-meta">Остальное — на жизнь</span></div>
+        <div className="row-main"><strong>{readOnly ? accountName(value.accountId) : 'На счёт'}</strong><span className="row-meta">Остальное доступно на расходы</span></div>
         <div className="row-side row-side-wrap">
           {!readOnly && <Select compact label="Счёт: отложить" placeholder="Счёт" value={value.accountId} options={accounts.map((account) => ({ value: account.id, label: account.name }))} onChange={(accountId) => set({ accountId })} />}
           <Amount label="Отложить" value={value.amount} readOnly={readOnly} onChange={(amount) => set({ amount })} />

@@ -1,5 +1,4 @@
 import { AccountBadge } from '@/components/ui'
-import { accountHue } from '@/lib/account-color'
 import type { Plan, PlanSummary } from '@/lib/domain'
 import AllocationSection from './AllocationSection'
 import BalancesSection from './BalancesSection'
@@ -15,8 +14,9 @@ export default function MonthView({ plan, summary, readOnly, update, categories,
   actions: MonthActions; footer: React.ReactNode
 }) {
   const accountName = (id: string) => plan.accounts.find((account) => account.id === id)?.name ?? 'Счёт удалён'
+  const accountBank = (id: string) => plan.accounts.find((account) => account.id === id)?.bank
   const liveAccounts = plan.accounts.filter((account) => !account.isArchived)
-  const accountTag = (id: string) => <AccountBadge name={accountName(id)} hue={accountHue(plan.accounts, id)} />
+  const accountTag = (id: string) => <AccountBadge name={accountName(id)} bank={accountBank(id)} />
   const saving = Boolean(savingsOf(plan)) && liveAccounts.length > 0
   return <div className="month-layout">
     <div className="month-sections">

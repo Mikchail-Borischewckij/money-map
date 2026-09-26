@@ -1,4 +1,6 @@
 export { default as AccountBadge } from './AccountBadge'
+export { default as BankLogo } from './BankLogo'
+export { Pagination, TableToolbar } from './TableTools'
 export { default as Badge } from './Badge'
 export { default as Button } from './Button'
 export { default as Checkbox } from './Checkbox'

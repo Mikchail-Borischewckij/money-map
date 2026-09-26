@@ -49,7 +49,7 @@ export default function MonthPage({ month, categories, onOpenSettings }: { month
     </header>
     {open && liveAccounts.length === 0 ? <div className="card onboarding">
       <h2>Начните с настроек</h2>
-      <ol><li>Добавьте счета.</li><li>Добавьте регулярные доходы и платежи.</li><li>Вернитесь сюда — месяц соберётся из настроек.</li></ol>
+      <ol><li>Добавьте счета.</li><li>Добавьте регулярные доходы и платежи.</li><li>Вернитесь в план месяца.</li></ol>
       <Button variant="primary" onClick={onOpenSettings}>Открыть настройки</Button>
     </div> : <MonthView plan={plan} summary={summary} readOnly={!open} categories={categories} actions={actions} update={month.update} footer={footer} />}
     {confirmClose && <Dialog title={`Закрыть ${monthName(plan.month, false).toLowerCase()}?`} onClose={() => setConfirmClose(false)}

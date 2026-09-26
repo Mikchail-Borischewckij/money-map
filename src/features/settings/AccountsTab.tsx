@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Plus } from 'lucide-react'
-import { AccountBadge, Button, Empty, RowMenu } from '@/components/ui'
-import { accountHue } from '@/lib/account-color'
+import { AccountBadge, Button, Empty, RowMenu, TableToolbar } from '@/components/ui'
 import { toCents } from '@/lib/api-client'
 import { money } from '@/lib/format'
 import AccountDialog, { type AccountValue } from './AccountDialog'
@@ -12,14 +11,19 @@ import { kindOptions, type AccountRow, type Preview, type Run } from './types'
 
 const body = (account: AccountRow, patch: Partial<AccountRow>) => {
   const next = { ...account, ...patch }
-  return { name: next.name, kind: next.kind, canFundTransfers: next.can_fund_transfers, priority: next.transfer_priority, version: next.version, sweepToAccountId: next.sweep_to_account_id ?? null, keepAmount: Number(next.keep_amount ?? 0) }
+  return { name: next.name, bank: next.bank, kind: next.kind, canFundTransfers: next.can_fund_transfers, priority: next.transfer_priority, version: next.version, sweepToAccountId: next.sweep_to_account_id ?? null, keepAmount: Number(next.keep_amount ?? 0) }
 }
 
 export default function AccountsTab({ accounts, csrfToken, run }: { accounts: AccountRow[]; csrfToken: string; run: Run }) {
   const [editing, setEditing] = useState<AccountRow | 'new' | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'priority' | 'name' | 'bank'>('priority')
   const active = accounts.filter((account) => !account.is_archived).sort((a, b) => a.transfer_priority - b.transfer_priority || a.name.localeCompare(b.name))
   const archived = accounts.filter((account) => account.is_archived)
+  const shown = active
+    .filter((account) => `${account.name} ${account.bank}`.toLocaleLowerCase('ru').includes(query.trim().toLocaleLowerCase('ru')))
+    .sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'ru') : sort === 'bank' ? a.bank.localeCompare(b.bank) || a.name.localeCompare(b.name, 'ru') : a.transfer_priority - b.transfer_priority)
 
   // List order is the order money is taken for transfers; everyone is renumbered so the move is unambiguous.
   const patch = (id: string, change: Partial<AccountRow>): Preview => (lists) => ({ ...lists, accounts: lists.accounts.map((account) => account.id === id ? { ...account, ...change } : account) })
@@ -32,9 +36,12 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
       (lists) => ({ ...lists, accounts: lists.accounts.map((account) => ({ ...account, transfer_priority: changes.find((change) => change.account.id === account.id)?.priority ?? account.transfer_priority })) }))
   }
 
-  const fields = (value: AccountValue): Partial<AccountRow> => ({ name: value.name, kind: value.kind, can_fund_transfers: value.canFundTransfers, sweep_to_account_id: value.sweepToAccountId, keep_amount: toCents(value.keepAmount) })
+  const fields = (value: AccountValue): Partial<AccountRow> => ({ name: value.name, bank: value.bank, kind: value.kind, can_fund_transfers: value.canFundTransfers, sweep_to_account_id: value.sweepToAccountId, keep_amount: toCents(value.keepAmount) })
   const kindLabel = (account: AccountRow) => kindOptions.find((option) => option.value === account.kind)?.label
-  const badge = (id: string) => <AccountBadge name={accounts.find((item) => item.id === id)?.name ?? 'Счёт удалён'} hue={accountHue(accounts, id)} />
+  const badge = (id: string) => {
+    const account = accounts.find((item) => item.id === id)
+    return <AccountBadge name={account?.name ?? 'Счёт удалён'} bank={account?.bank} />
+  }
   // How the account takes part in transfers.
   const transfers = (account: AccountRow) => {
     if (account.kind === 'business') {
@@ -51,19 +58,23 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     setEditing(null)
     void run(() => current
       ? send(`/api/accounts/${current.id}`, 'PUT', csrfToken, body(current, fields(value)))
-      : send('/api/accounts', 'POST', csrfToken, { name: value.name, kind: value.kind, canFundTransfers: value.canFundTransfers, priority: (active.length + 1) * 10, sweepToAccountId: value.sweepToAccountId, keepAmount: toCents(value.keepAmount) }),
+      : send('/api/accounts', 'POST', csrfToken, { name: value.name, bank: value.bank, kind: value.kind, canFundTransfers: value.canFundTransfers, priority: (active.length + 1) * 10, sweepToAccountId: value.sweepToAccountId, keepAmount: toCents(value.keepAmount) }),
     current ? 'Счёт сохранён.' : 'Счёт добавлен.',
     current ? patch(current.id, fields(value))
       : (lists) => ({ ...lists, accounts: [...lists.accounts, { id: `new-${crypto.randomUUID()}`, transfer_priority: (active.length + 1) * 10, is_archived: false, version: 0, ...fields(value) } as AccountRow] }))
   }
 
   return <section className="card">
-    <header className="card-head"><div><h2>Счета</h2><p className="muted">№ — откуда в первую очередь брать деньги на переводы.</p></div>
-      <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>Счёт</Button></header>
+    <header className="card-head"><div><h2>Счета</h2><p className="muted">Приоритет определяет порядок переводов.</p></div></header>
+    <TableToolbar query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort} sortOptions={[
+      { value: 'priority', label: 'По приоритету' }, { value: 'name', label: 'По названию' }, { value: 'bank', label: 'По банку' },
+    ]}><Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>Добавить счёт</Button></TableToolbar>
     {active.length === 0 && <Empty>Счетов пока нет.</Empty>}
     {active.length > 0 && <div className="table-scroll"><table className="data-table">
       <thead><tr><th className="num col-narrow">№</th><th>Счёт</th><th className="col-opt">Тип</th><th className="col-opt">Переводы</th><th className="actions"><span className="sr-only">Действия</span></th></tr></thead>
-      <tbody>{active.map((account, index) => <tr key={account.id}>
+      <tbody>{shown.map((account) => {
+        const index = active.findIndex((item) => item.id === account.id)
+        return <tr key={account.id}>
         <td className="num col-narrow muted">{index + 1}</td>
         <td>{badge(account.id)}<div className="cell-sub"><span>{kindLabel(account)}</span>{transfers(account)}</div></td>
         <td className="col-opt">{kindLabel(account)}</td>
@@ -76,7 +87,7 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
             { label: 'В архив', danger: true, onSelect: () => void run(() => send(`/api/accounts/${account.id}`, 'DELETE', csrfToken, { expectedVersion: account.version }), 'Счёт в архиве. Закрытые месяцы не изменились.', patch(account.id, { is_archived: true })) },
           ]} />
         </div></td>
-      </tr>)}</tbody>
+      </tr>})}</tbody>
     </table></div>}
     {archived.length > 0 && <button type="button" className="link archived-toggle" onClick={() => setShowArchived(!showArchived)}>{showArchived ? 'Скрыть архив' : `Архив · ${archived.length}`}</button>}
     {showArchived && <table className="data-table"><tbody>{archived.map((account) => <tr className="is-muted" key={account.id}>

@@ -1,5 +1,6 @@
-import { cx } from '@/lib/format'
+import type { BankId } from '@/lib/banks'
+import BankLogo from './BankLogo'
 
-export default function AccountBadge({ name, hue }: { name: string; hue: number | null }) {
-  return <span className={cx('account-badge', hue === null && 'is-plain')} style={hue === null ? undefined : { '--hue': hue } as React.CSSProperties}>{name}</span>
+export default function AccountBadge({ name, bank }: { name: string; bank?: BankId | string | null; hue?: number | null }) {
+  return <BankLogo bank={bank} name={name} />
 }

@@ -16,7 +16,7 @@ const zl = (cents: number) => cents / 100
 export function toUiPlan(plan: MoneyPlan): Plan {
   return {
     month: plan.month, startDay: plan.startDay, balancesOn: plan.balancesOn ?? null,
-    accounts: plan.accounts.map((account) => ({ ...account, kind: account.kind as Account['kind'], openingBalance: zl(account.openingBalance), keepAmount: zl(account.keepAmount ?? 0) })),
+    accounts: plan.accounts.map((account) => ({ ...account, bank: account.bank as Account['bank'], kind: account.kind as Account['kind'], openingBalance: zl(account.openingBalance), keepAmount: zl(account.keepAmount ?? 0) })),
     incomes: plan.incomes.map((income) => ({ ...income, amount: zl(income.amount) })),
     payments: plan.payments.map((payment) => ({ ...payment, amount: zl(payment.amount), unitPrice: payment.unitPrice == null ? null : zl(payment.unitPrice) })),
     allocations: plan.allocations.map((allocation) => ({ ...allocation, amount: zl(allocation.amount) })),
@@ -27,7 +27,7 @@ export function toUiSummary(summary: ServerRecord['summary']): PlanSummary {
   return {
     ...summary,
     accounts: summary.accounts.map((account) => ({
-      ...account, kind: account.kind as Account['kind'],
+      ...account, bank: account.bank as Account['bank'], kind: account.kind as Account['kind'],
       openingBalance: zl(account.openingBalance), expectedIncome: zl(account.expectedIncome),
       payments: zl(account.payments), allocations: zl(account.allocations), keep: zl(account.keep), keepAmount: zl(account.keepAmount ?? 0),
       available: zl(account.available), needed: zl(account.needed), gap: zl(account.gap), surplus: zl(account.surplus),

@@ -144,3 +144,17 @@ it('adds business accounts and period start days, and drops the open month livin
     await pg.close()
   }
 })
+
+it('adds bank identities to accounts and snapshots', async () => {
+  const pg = new PGlite({ extensions: { pgcrypto } })
+  try {
+    const files = ['001_initial.sql', '002_users_initial_email.sql', '003_payment_schedules.sql', '004_single_open_month.sql', '005_income_amount_varies.sql', '006_business_accounts.sql', '007_period_start_day.sql', '008_payment_checked.sql', '009_account_banks.sql']
+    for (const file of files) await pg.exec(await readFile(new URL(`./migrations/${file}`, import.meta.url), 'utf8'))
+    const household = (await pg.query<{ id: string }>('SELECT id FROM households')).rows[0].id
+    await pg.query("INSERT INTO accounts (household_id, name, bank) VALUES ($1, 'Основной', 'pko')", [household])
+    expect((await pg.query<{ bank: string }>("SELECT bank FROM accounts WHERE name = 'Основной'")).rows).toEqual([{ bank: 'pko' }])
+    await expect(pg.query("INSERT INTO accounts (household_id, name, bank) VALUES ($1, 'Ошибка', 'unknown')", [household])).rejects.toThrow()
+  } finally {
+    await pg.close()
+  }
+})

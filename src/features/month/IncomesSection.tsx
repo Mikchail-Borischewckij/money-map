@@ -35,7 +35,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
         ]
         return <div className={cx('row', status === 'excluded' && 'is-muted')} key={income.id}>
           <div className="row-main">
-            <strong>{income.name}<Attention reasons={[...(estimate ? ['Сумма — оценка из настроек: впишите точную или «Сумма верна» в меню'] : []), ...(past ? ['Дата раньше остатков: возможно, деньги уже на счёте'] : [])]} /></strong>
+            <strong>{income.name}<Attention reasons={[...(estimate ? ['Укажите точную сумму или подтвердите текущую'] : []), ...(past ? ['Дата раньше даты остатков. Доход может быть уже учтён'] : [])]} /></strong>
             <span className="row-meta row-tags">{accountTag(income.accountId)}{dayText(income.expectedOn) && <span>{dayText(income.expectedOn)}</span>}{!income.recurringIncomeId && <span>разовый</span>}</span>
           </div>
           <div className="row-side row-side-wrap">

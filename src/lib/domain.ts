@@ -1,11 +1,13 @@
 import { toApiPlan, toUiSummary } from './api-client'
 import { calculateMoneyPlan } from '../server/money'
+import type { BankId } from './banks'
 
 export type AccountKind = 'current' | 'savings' | 'cash' | 'business'
 
 export type Account = {
   id: string
   name: string
+  bank?: BankId
   kind: AccountKind
   openingBalance: number
   balanceConfirmed?: boolean
