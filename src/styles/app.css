@@ -45,6 +45,8 @@
 .amount { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
 .amount-locked { min-width: 150px; padding-right: var(--space-3); text-align: right; }
 .amount.negative { color: var(--danger); }
+/* Checked, so not editable: the dotted underline and the help cursor say the text is a locked field, not a gap. */
+.amount.is-locked { cursor: help; text-decoration: underline dotted var(--border-strong); text-underline-offset: 4px; }
 .muted { color: var(--muted); }
 .note { margin-top: 10px; font-size: var(--text-sm); color: var(--muted); }
 .warn-text { font-size: var(--text-sm); color: var(--danger); }
@@ -76,6 +78,10 @@
 .units { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .units-cell { justify-content: flex-end; }
 .units-price { font-size: var(--text-md); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* What must stay on the account this month. It shapes the transfers but is not taken out of the result. */
+.keep-field { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--muted); }
+.keep-field .money-input { width: 120px; }
+.keep-field .money-input input, .keep-field .amount { color: var(--text); }
 .balances-date { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); color: var(--muted); }
 .balances-date .select-compact { width: 200px; }
 .add-saving { justify-self: start; }
@@ -448,6 +454,8 @@
   .row-side-wrap .segmented { flex: 1 1 100%; }
   .row-side-wrap .segmented button { flex: 1; }
   .amount-locked { min-width: 0; margin-left: auto; }
+  .keep-field { order: 2; flex-basis: 100%; justify-content: space-between; }
+  .keep-field .money-input { width: 140px; }
       .units { flex: 1; }
   .units-price { font-size: var(--text-sm); }
   .money-input { width: 140px; margin-left: auto; }

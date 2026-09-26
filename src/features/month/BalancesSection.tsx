@@ -15,6 +15,7 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
   const accounts = plan.accounts.filter((account) => !account.isArchived || account.openingBalance !== 0)
   const checked = accounts.filter((account) => account.balanceConfirmed).length
   const change = (id: string, patch: Partial<Account>) => update((current) => ({ ...current, accounts: current.accounts.map((account) => account.id === id ? { ...account, ...patch } : account) }))
+  const locked = (account: Account) => readOnly || Boolean(account.balanceConfirmed)
   const sum = total(accounts.map((account) => ({ amount: account.openingBalance })))
   // Most months nothing has moved and every balance is right: one button instead of one click per account.
   const confirmAll = () => update((current) => ({ ...current, accounts: current.accounts.map((account) => account.balanceConfirmed ? account : { ...account, balanceConfirmed: true, balanceDate: today() }) }))
@@ -27,9 +28,13 @@ export default function BalancesSection({ plan, readOnly, update, onOpenSettings
       {accounts.map((account) => <div className="row" key={account.id}>
         <div className="row-main"><strong><AccountBadge name={account.name} bank={account.bank} /></strong></div>
         <div className="row-side">
-          {/* Editing a checked amount unchecks it, so the count in the header is always honest. */}
-          <Amount label={`Сколько на счёте: ${account.name}`} value={account.openingBalance} readOnly={readOnly} className="amount-locked"
-            onChange={(openingBalance) => change(account.id, { openingBalance, balanceConfirmed: false, balanceDate: null })} />
+          {/* A checked row is closed: neither the balance nor the amount to keep can move. Untick it to change them. */}
+          <Amount label={`Сколько на счёте: ${account.name}`} value={account.openingBalance} readOnly={locked(account)} locked={!readOnly && Boolean(account.balanceConfirmed)} className="amount-locked"
+            onChange={(openingBalance) => change(account.id, { openingBalance })} />
+          {/* What must stay on the account this month (a fee, a reserve); starts from the account setting. */}
+          {(!locked(account) || Boolean(account.keepAmount)) && <span className="keep-field"><span>Оставить</span>
+            <Amount label={`Оставить на счёте: ${account.name}`} value={account.keepAmount ?? 0} readOnly={locked(account)} locked={!readOnly && Boolean(account.balanceConfirmed)}
+              onChange={(keepAmount) => change(account.id, { keepAmount })} /></span>}
           {readOnly
             ? account.balanceConfirmed && <Check size={16} className="checked-mark" aria-label="Проверено" />
             : <Checkbox checked={account.balanceConfirmed ?? false} onChange={(balanceConfirmed) => change(account.id, { balanceConfirmed, balanceDate: balanceConfirmed ? today() : null })}>Проверено</Checkbox>}

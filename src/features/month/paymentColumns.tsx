@@ -19,8 +19,8 @@ const whenOf = (payment: Payment) => weeklyOf(payment) && payment.weekdays ? wee
 export const paymentRowClass = (payment: Payment) => payment.enabled ? undefined : 'is-muted'
 
 export function paymentColumns({ period, readOnly, accountTag, accountName, onChange, onRemove, onReset }: Options): Column<Payment>[] {
-  // Nothing is locked: changing an amount takes the tick off the row, so "Проверено N из M" stays true.
-  const locked = (payment: Payment) => readOnly || !payment.enabled
+  // A checked row is closed: no amount, no count, no excluding, no deleting. Take the tick off to change anything.
+  const locked = (payment: Payment) => readOnly || Boolean(payment.checked) || !payment.enabled
   const past = (payment: Payment) => payment.enabled && !weeklyOf(payment) && beforeBalances(period, payment.due)
   return [
     { key: 'name', header: 'Платёж', sort: (payment) => payment.name, mobile: 'title', cell: (payment) => <span className="cell-name">
@@ -37,9 +37,9 @@ export function paymentColumns({ period, readOnly, accountTag, accountName, onCh
       footer: (rows) => plainAmount(total(rows.filter((payment) => payment.enabled))),
       card: (payment) => <strong className="amount">{plainAmount(payment.amount)}</strong>,
       cell: (payment) => {
-        if (!weeklyOf(payment)) return <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={locked(payment)} plain
-          onChange={(value) => onChange(payment.id, { amount: value, amountPending: false, checked: false })} />
-        const setQuantity = (quantity: number) => onChange(payment.id, { quantity, amount: round(payment.unitPrice! * quantity), checked: false })
+        if (!weeklyOf(payment)) return <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={locked(payment)} plain locked={!readOnly && Boolean(payment.checked)}
+          onChange={(value) => onChange(payment.id, { amount: value, amountPending: false })} />
+        const setQuantity = (quantity: number) => onChange(payment.id, { quantity, amount: round(payment.unitPrice! * quantity) })
         return <div className="units units-cell">
           {locked(payment) ? <span>{payment.quantity} раз</span> : <Stepper label={`Сколько раз: ${payment.name}`} value={payment.quantity!} onChange={setQuantity} />}
           <span className="units-price">× {plainAmount(payment.unitPrice!)}</span>
@@ -52,13 +52,13 @@ export function paymentColumns({ period, readOnly, accountTag, accountName, onCh
         if (readOnly) return payment.checked && payment.enabled ? <Check size={16} className="checked-mark" aria-label="Проверено" /> : null
         if (!payment.enabled) return <Button size="sm" onClick={() => onChange(payment.id, { enabled: true })}>Вернуть</Button>
         const calendar = weeklyOf(payment) && payment.weekdays ? countWeekdaysInPeriod(period, payment.weekdays) : null
-        const menu: MenuItem[] = [
+        const menu: MenuItem[] = payment.checked ? [] : [
           ...(calendar !== null && calendar !== payment.quantity
-            ? [{ label: `Поставить по календарю: ${calendar}`, onSelect: () => onChange(payment.id, { quantity: calendar, amount: round(payment.unitPrice! * calendar), checked: false }) }]
+            ? [{ label: `Поставить по календарю: ${calendar}`, onSelect: () => onChange(payment.id, { quantity: calendar, amount: round(payment.unitPrice! * calendar) }) }]
             : []),
           { label: 'Не платить в этом месяце', onSelect: () => onChange(payment.id, { enabled: false }) },
           ...(payment.recurringPaymentId
-            ? payment.checked ? [] : [{ label: 'Вернуть как в настройках', onSelect: () => onReset(payment.id) }]
+            ? [{ label: 'Вернуть как в настройках', onSelect: () => onReset(payment.id) }]
             : [{ label: 'Удалить', danger: true, onSelect: () => onRemove(payment.id) }]),
         ]
         return <div className="cell-actions">

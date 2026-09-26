@@ -53,11 +53,12 @@ export default function AccountsTab({ accounts, csrfToken, run }: { accounts: Ac
     const account = accounts.find((item) => item.id === id)
     return <AccountBadge name={account?.name ?? 'Счёт удалён'} bank={account?.bank} />
   }
-  // How the account takes part in transfers. Only a business account holds a reserve back from its sweep.
+  // How the account takes part in transfers, and what is never taken off it.
   const transfers = (account: AccountRow) => {
     const keep = Number(account.keep_amount ?? 0)
-    if (account.kind === 'business') return <span className="cell-flow">{account.sweep_to_account_id ? <>Излишек <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Излишек не переводится'}{keep > 0 && <span className="muted">оставлять {money(keep / 100)}</span>}</span>
-    return <span className="cell-flow">{account.kind === 'cash' ? <span className="muted">Только пополнение</span> : account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>}</span>
+    const kept = keep > 0 && <span className="muted">оставлять {money(keep / 100)}</span>
+    if (account.kind === 'business') return <span className="cell-flow">{account.sweep_to_account_id ? <>Излишек <ArrowRight size={14} /> {badge(account.sweep_to_account_id)}</> : 'Излишек не переводится'}{kept}</span>
+    return <span className="cell-flow">{account.kind === 'cash' ? <span className="muted">Только пополнение</span> : account.can_fund_transfers ? 'Можно брать' : <span className="muted">Не брать</span>}{kept}</span>
   }
   // An archived account comes back last in the transfer order and appears in the open month again.
   const restore = (account: AccountRow) => run(() => send(`/api/accounts/${account.id}/restore`, 'POST', csrfToken, { expectedVersion: account.version }), 'Вернули из архива. Счёт появился в открытом месяце.',

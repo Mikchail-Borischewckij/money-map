@@ -10,7 +10,7 @@ import type { UpdatePlan } from './utils'
 
 type Row = PlanSummary['accounts'][number]
 
-const signed = (value: number) => value === 0 ? amount(0) : `${value > 0 ? '+' : '−'} ${amount(Math.abs(value))}`
+const signed = (value: number) => value === 0 ? amount(0) : `${value > 0 ? '+' : '−'}${amount(Math.abs(value))}`
 const spent = (account: Row) => account.payments + account.allocations
 const moved = (account: Row) => account.incoming - account.outgoing
 const sum = (rows: Row[], pick: (account: Row) => number) => rows.reduce((total, account) => total + pick(account), 0)
@@ -30,8 +30,8 @@ export default function TransfersSection({ step, summary, accountTag, readOnly, 
     { key: 'name', header: 'Счёт', sort: (account) => account.name, mobile: 'title', cell: (account) => accountTag(account.id) },
     { key: 'available', header: 'Будет на счёте', align: 'right', mobileLabel: true, sort: (account) => account.available, cell: (account) => amount(account.available), footer: (rows) => money(sum(rows, (account) => account.available)) },
     { key: 'spent', header: 'К оплате', align: 'right', mobileLabel: true, sort: spent,
-      cell: (account) => spent(account) ? `− ${amount(spent(account))}` : amount(0),
-      footer: (rows) => `− ${money(sum(rows, spent))}` },
+      cell: (account) => spent(account) ? `−${amount(spent(account))}` : amount(0),
+      footer: (rows) => `−${money(sum(rows, spent))}` },
     { key: 'moved', header: 'Перевод', align: 'right', mobileLabel: true, sort: moved, cell: (account) => signed(moved(account)) },
     { key: 'remaining', header: 'Останется', align: 'right', mobile: 'amount', sort: (account) => account.remaining,
       cell: (account) => <strong className={cx(account.remaining < 0 && 'negative')}>{amount(account.remaining)}</strong>,

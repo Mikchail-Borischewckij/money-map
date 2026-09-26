@@ -29,6 +29,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   // Excluded incomes need no check, so they are not counted.
   const toCheck = plan.incomes.filter((income) => income.enabled && income.status !== 'excluded')
   const unchecked = plan.incomes.filter(incomeToCheck).length
+  const locked = (income: Income) => readOnly || Boolean(income.checked)
   const confirmAll = () => update((current) => ({ ...current, incomes: current.incomes.map((income) => incomeToCheck(income) ? { ...income, checked: true, amountPending: false } : income) }))
 
   const columns: Column<Income>[] = [
@@ -49,19 +50,18 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
       cell: (income) => statusOf(income) === 'expected' ? null : <Badge tone={statusOf(income) === 'excluded' ? 'neutral' : 'blue'}>{statusLabel(statusOf(income))}</Badge> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (income) => income.amount, footer: (rows) => money(total(expected(rows))),
       card: (income) => <strong className="amount">{plainAmount(income.amount)}</strong>,
-      cell: (income) => <Amount label={`Сумма: ${income.name}`} value={income.amount} readOnly={readOnly} plain
-        onChange={(value) => change(income.id, { amount: value, amountPending: false, checked: false })} /> },
+      cell: (income) => <Amount label={`Сумма: ${income.name}`} value={income.amount} readOnly={locked(income)} plain locked={!readOnly && Boolean(income.checked)}
+        onChange={(value) => change(income.id, { amount: value, amountPending: false })} /> },
     { key: 'check', header: 'Проверено', mobile: 'end', className: 'actions',
       filter: { type: 'list', value: (income) => statusOf(income) === 'excluded' ? 'Не будет' : income.checked ? 'Проверено' : 'Не проверено' },
       cell: (income) => {
         const excluded = statusOf(income) === 'excluded'
         if (readOnly) return !excluded && income.checked ? <Check size={16} className="checked-mark" aria-label="Проверено" /> : null
-        // The tick covers the status as well as the amount, so changing one takes it off, like editing the other.
-        const status = (value: Income['status'], label: string) => ({ label, onSelect: () => change(income.id, { status: value, enabled: true, checked: false, ...(value === 'included' ? { amountPending: false } : {}) }) })
-        const menu: MenuItem[] = [
+        // A checked row is closed: no amount, no status, no deleting. Take the tick off to change anything.
+        const status = (value: Income['status'], label: string) => ({ label, onSelect: () => change(income.id, { status: value, enabled: true, ...(value === 'included' ? { amountPending: false } : {}) }) })
+        const menu: MenuItem[] = locked(income) ? [] : [
           ...incomeStatuses.filter((item) => item.value !== statusOf(income)).map((item) => status(item.value, item.label)),
-          ...(income.recurringIncomeId ? [] : [{ label: 'Удалить', danger: true, onSelect: () => remove(income.id) }]),
-          ...(income.recurringIncomeId && !income.checked ? [{ label: 'Вернуть как в настройках', onSelect: () => onReset(income.id) }] : []),
+          ...(income.recurringIncomeId ? [{ label: 'Вернуть как в настройках', onSelect: () => onReset(income.id) }] : [{ label: 'Удалить', danger: true, onSelect: () => remove(income.id) }]),
         ]
         return <div className="cell-actions">
           {!excluded && <Checkbox checked={Boolean(income.checked)} label={`Проверено: ${income.name}`} onChange={(checked) => change(income.id, checked ? { checked, amountPending: false } : { checked })} />}
