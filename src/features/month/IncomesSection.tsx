@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Check } from 'lucide-react'
 import { AddButton, Badge, Button, Checkbox, DataTable, Empty, RowMenu, type Column, type MenuItem } from '@/components/ui'
 import { amountToCheck, type Account, type Income, type Plan } from '@/lib/domain'
-import { money } from '@/lib/format'
+import { amount as plainAmount, money } from '@/lib/format'
 import Amount from './Amount'
 import Attention from './Attention'
 import OneOffDialog from './OneOffDialog'
@@ -48,6 +48,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
       filter: { type: 'list', value: statusOf, label: statusLabel },
       cell: (income) => statusOf(income) === 'expected' ? null : <Badge tone={statusOf(income) === 'excluded' ? 'neutral' : 'blue'}>{statusLabel(statusOf(income))}</Badge> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (income) => income.amount, footer: (rows) => money(total(expected(rows))),
+      card: (income) => <strong className="amount">{plainAmount(income.amount)}</strong>,
       cell: (income) => <Amount label={`Сумма: ${income.name}`} value={income.amount} readOnly={readOnly} plain
         onChange={(value) => change(income.id, { amount: value, amountPending: false, checked: false })} /> },
     { key: 'check', header: 'Проверено', mobile: 'end', className: 'actions',
@@ -71,7 +72,7 @@ export default function IncomesSection({ plan, readOnly, update, accountTag, acc
   return <Section step={2} title="Доходы" open={open} onToggle={onToggle} done={done}
     total={plan.incomes.length > 0 && `Ожидается ${money(total(expected(plan.incomes)))}`} meta={progress(toCheck.length - unchecked, toCheck.length)}
     action={!readOnly && unchecked > 1 && <Button size="sm" variant="ghost" onClick={confirmAll}>Проверить все</Button>}>
-    <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns}
+    <DataTable label="Доходы" rows={plan.incomes} rowKey={(income) => income.id} columns={columns} rowTitle={(income) => income.name}
       rowClassName={(income) => statusOf(income) === 'excluded' ? 'is-muted' : undefined}
       defaultSort={{ key: 'when', dir: 'asc' }} footerLabel="Ожидается"
       search={(income) => `${income.name} ${accountName(income.accountId)}`}

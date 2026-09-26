@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { AccountBadge } from '@/components/ui'
+import { AccountBadge, Button } from '@/components/ui'
 import type { CategoryNames, Plan, PlanSummary } from '@/lib/domain'
 import AllocationSection from './AllocationSection'
 import BalancesSection from './BalancesSection'
@@ -11,9 +11,9 @@ import SummaryCard from './SummaryCard'
 import TransfersSection from './TransfersSection'
 import { incomeToCheck, paymentToCheck, readyForTransfers, savingsOf, type MonthActions, type UpdatePlan } from './utils'
 
-// One month as steps plus the result. Only one step is open at a time — the first one with work left in it, unless
-// the reader opened another. A folded step still shows its total and how much of it is done, so nothing is hidden,
-// and the screen asks for one thing instead of ninety.
+// One month as steps plus the result. The month opens on the first step that still has work in it, so the screen
+// starts with one thing instead of ninety — but that is only where it starts: every step opens and closes on its
+// own, any number at once, in whatever order suits. Nothing folds or unfolds by itself after that.
 export default function MonthView({ plan, summary, readOnly, update, categories, actions, footer }: {
   plan: Plan; summary: PlanSummary; readOnly: boolean; update: UpdatePlan; categories: CategoryNames
   actions: MonthActions; footer?: (goToStep: (step: number) => void) => React.ReactNode
@@ -39,27 +39,35 @@ export default function MonthView({ plan, summary, readOnly, update, categories,
     { step: transfersStep, pending: !readOnly && ready && pendingTransfers > 0, done: !readOnly && ready && summary.transfers.length > 0 && pendingTransfers === 0 },
   ]
   const doneOf = (step: number) => steps.find((item) => item.step === step)?.done ?? false
-  // 0 means "everything folded": the reader's own choice, and where a finished month starts.
-  const [chosen, setChosen] = useState<number | null>(null)
-  const current = steps.find((item) => item.pending)?.step ?? 0
-  const active = chosen !== null && !doneOf(chosen) ? chosen : current
-  const at = (step: number) => ({ open: active === step, onToggle: () => setChosen(active === step ? 0 : step), done: doneOf(step) })
+  const [open, setOpen] = useState<Set<number>>(() => { const first = steps.find((item) => item.pending)?.step; return new Set(first ? [first] : []) })
+  const at = (step: number) => ({
+    open: open.has(step),
+    done: doneOf(step),
+    onToggle: () => setOpen((current) => { const next = new Set(current); if (!next.delete(step)) next.add(step); return next }),
+  })
   const goToStep = (step: number) => {
-    setChosen(step)
+    setOpen((current) => new Set(current).add(step))
     requestAnimationFrame(() => document.getElementById(`step-${step}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
   }
+  const all = steps.map((item) => item.step)
+  const allOpen = all.every((step) => open.has(step))
 
   return <div className="month-layout">
     <div className="month-sections">
+      <div className="month-tools">
+        <Button size="sm" variant="ghost" onClick={() => setOpen(allOpen ? new Set() : new Set(all))}>{allOpen ? 'Свернуть все' : 'Развернуть все'}</Button>
+      </div>
       <BalancesSection {...at(1)} plan={plan} readOnly={readOnly} update={update} onOpenSettings={actions.onOpenSettings} />
       <IncomesSection {...at(2)} plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} categories={categories.income} onReset={actions.onResetIncome} />
       <PaymentsSection {...at(3)} plan={plan} readOnly={readOnly} update={update} accountTag={accountTag} accounts={liveAccounts} categories={categories.payment} onReset={actions.onResetPayment} />
       <AllocationSection {...at(4)} step={4} plan={plan} readOnly={readOnly} update={update} accounts={liveAccounts} accountName={accountName} />
       <TransfersSection {...at(transfersStep)} step={transfersStep} summary={summary} accountTag={accountTag} readOnly={readOnly} ready={ready} update={update} />
-      {/* The close card belongs after the steps. It used to sit in the aside, which `order: -1` threw to the top of
-          every screen under 1100px — the last action of the month arrived before the first step. */}
-      {footer?.(goToStep)}
     </div>
-    <aside className="month-summary"><SummaryCard summary={summary} /></aside>
+    {/* The close card stays under the result card. Below 1100px the aside is `display: contents`, so only the result
+        moves above the steps and the close card keeps its place at the end. */}
+    <aside className="month-summary">
+      <SummaryCard summary={summary} />
+      {footer?.(goToStep)}
+    </aside>
   </div>
 }

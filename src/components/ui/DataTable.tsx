@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, GripVertical, Search, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, Filter, GripVertical, Search, SlidersHorizontal, X } from 'lucide-react'
 import { cx } from '@/lib/format'
 import Button from './Button'
 import Checkbox from './Checkbox'
+import Dialog from './Dialog'
 import Select from './Select'
 
 export type ColumnFilter<T> =
@@ -17,6 +18,9 @@ export type Column<T> = {
   key: string
   header: string
   cell: (row: T) => React.ReactNode
+  // What the phone card shows instead of `cell`. A card is for reading: an amount is text there, and the input
+  // that `cell` returns is reached by opening the row.
+  card?: (row: T) => React.ReactNode
   sort?: (row: T) => string | number
   filter?: ColumnFilter<T>
   align?: 'right' | 'center'
@@ -53,6 +57,28 @@ function useOutside(open: boolean, close: () => void) {
   return root
 }
 
+const filterOptions = <T,>(filter: ColumnFilter<T>, rows: T[]) => filter.type === 'list'
+  ? [...new Set(rows.map(filter.value))].sort((a, b) => compare(filter.label?.(a) ?? a, filter.label?.(b) ?? b))
+  : []
+
+// The choices of one filter, without any chrome: the same body serves the header popup and the phone sheet.
+function FilterBody<T>({ column, rows, value, onChange, onDone }: { column: Column<T> & { filter: ColumnFilter<T> }; rows: T[]; value: string[] | string | undefined; onChange: (value: string[] | string | undefined) => void; onDone?: () => void }) {
+  const filter = column.filter
+  const picked = Array.isArray(value) ? value : []
+  const active = Array.isArray(value) ? value.length > 0 : Boolean(value)
+  return <>
+    {filter.type === 'text'
+      ? <input className="text-input" placeholder={column.header} aria-label={column.header} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value || undefined)} />
+      : <div className="dt-filter-options">
+        {filterOptions(filter, rows).map((option) => <Checkbox key={option} checked={picked.includes(option)}
+          onChange={(checked) => { const next = checked ? [...picked, option] : picked.filter((item) => item !== option); onChange(next.length ? next : undefined) }}>
+          {(filter.label?.(option) ?? option) || '—'}
+        </Checkbox>)}
+      </div>}
+    {active && <button type="button" className="link" onClick={() => { onChange(undefined); onDone?.() }}>Сбросить</button>}
+  </>
+}
+
 function FilterMenu<T>({ column, rows, value, onChange }: { column: Column<T> & { filter: ColumnFilter<T> }; rows: T[]; value: string[] | string | undefined; onChange: (value: string[] | string | undefined) => void }) {
   // The menu is placed against the screen, so a scrolling table does not clip it; it closes when the page scrolls.
   const [place, setPlace] = useState<{ top: number; left: number } | null>(null)
@@ -71,24 +97,13 @@ function FilterMenu<T>({ column, rows, value, onChange }: { column: Column<T> & 
     const rect = button.getBoundingClientRect()
     setPlace({ top: rect.bottom + 4, left: Math.max(8, Math.min(rect.left, window.innerWidth - 308)) })
   }
-  const filter = column.filter
   const active = Array.isArray(value) ? value.length > 0 : Boolean(value)
-  const options = filter.type === 'list' ? [...new Set(rows.map(filter.value))].sort((a, b) => compare(filter.label?.(a) ?? a, filter.label?.(b) ?? b)) : []
-  const picked = Array.isArray(value) ? value : []
   return <div className="dt-filter" ref={root}>
     <button type="button" className={cx('dt-filter-button', active && 'is-active')} aria-label={`Фильтр: ${column.header}`} aria-expanded={open} aria-controls={id} onClick={(event) => toggle(event.currentTarget)}>
       <Filter size={13} />
     </button>
     {place && <div className="dt-filter-menu" id={id} role="dialog" aria-label={`Фильтр: ${column.header}`} style={place}>
-      {filter.type === 'text'
-        ? <input className="text-input" autoFocus placeholder={column.header} aria-label={column.header} value={typeof value === 'string' ? value : ''} onChange={(event) => onChange(event.target.value || undefined)} />
-        : <div className="dt-filter-options">
-          {options.map((option) => <Checkbox key={option} checked={picked.includes(option)}
-            onChange={(checked) => { const next = checked ? [...picked, option] : picked.filter((item) => item !== option); onChange(next.length ? next : undefined) }}>
-            {(filter.label?.(option) ?? option) || '—'}
-          </Checkbox>)}
-        </div>}
-      {active && <button type="button" className="link" onClick={() => { onChange(undefined); setPlace(null) }}>Сбросить</button>}
+      <FilterBody column={column} rows={rows} value={value} onChange={onChange} onDone={() => setPlace(null)} />
     </div>}
   </div>
 }
@@ -161,10 +176,12 @@ type Reorder<T> = { canMove: (row: T) => boolean; onMove: (keys: string[]) => vo
 
 // The one table of the app: sorting by header, column filters, search, pagination; cards on a phone.
 // With `reorder` the row order is the data itself, so sorting, filters and pages are off.
-export default function DataTable<T>({ rows, columns, rowKey, rowClassName, search, defaultSort, actions, empty, footerLabel = 'Итого', reorder, label }: {
+export default function DataTable<T>({ rows, columns, rowKey, rowClassName, search, defaultSort, actions, empty, footerLabel = 'Итого', reorder, label, rowTitle }: {
   rows: T[]; columns: Column<T>[]; rowKey: (row: T) => string; rowClassName?: (row: T) => string | undefined
   search?: (row: T) => string; defaultSort?: Sort; actions?: React.ReactNode; empty?: React.ReactNode; footerLabel?: string
   reorder?: Reorder<T>; label: string
+  // With `rowTitle` a phone card opens into a sheet holding the whole row, so the card itself can stay two lines.
+  rowTitle?: (row: T) => string
 }) {
   const phone = usePhone()
   // Cards also when the table does not fit its container (a laptop next to the summary, a tablet).
@@ -196,6 +213,8 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const [filters, setFilters] = useState<Filters>({})
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(pageSizes[0])
+  const [sheet, setSheet] = useState<string | null>(null)
+  const [tuning, setTuning] = useState(false)
   const fixed = Boolean(reorder)
 
   const text = lower(query.trim())
@@ -230,8 +249,10 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const reset = () => { setFilters({}); setQuery(''); setPage(1) }
   const nothing = <p className="dt-nothing muted">Ничего не найдено.</p>
 
-  const toolbar = (search && !fixed) || actions || filtered ? <div className={cx('table-toolbar', !(search && !fixed) && 'is-plain')}>
-    {search && !fixed && <label className="table-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Поиск</span>
+  // A phone shows the search box only once the list is long enough to need it; ten rows are faster to scroll.
+  const searchable = Boolean(search) && !fixed && (!cards || rows.length > pageSizes[0])
+  const toolbar = searchable || actions || filtered ? <div className={cx('table-toolbar', !searchable && 'is-plain')}>
+    {searchable && <label className="table-search"><Search size={16} aria-hidden="true" /><span className="sr-only">Поиск</span>
       <input value={query} placeholder="Поиск" onChange={(event) => { setQuery(event.target.value); setPage(1) }} />
     </label>}
     {(filtered || actions) && <div className="table-toolbar-actions">
@@ -245,31 +266,44 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
   const pager = !fixed && shown.length > pageSizes[0] && <Pagination page={current} pages={pages} total={shown.length} size={size} onPage={setPage} onSize={(value) => { setSize(value); setPage(1) }} />
 
   if (cards) {
-    const controls = columns.filter((column) => !column.hideHeader && ((column.sort && onSort) || (column.filter && onFilter)))
-    const place = (role: NonNullable<Column<T>['mobile']>) => columns.filter((column, index) => (column.mobile ?? (index === 0 ? 'title' : 'meta')) === role)
+    const roleOf = (column: Column<T>, index: number) => column.mobile ?? (index === 0 ? 'title' : 'meta')
+    const place = (role: NonNullable<Column<T>['mobile']>) => columns.filter((column, index) => roleOf(column, index) === role)
     const [titles, amounts, fulls, metas, ends] = (['title', 'amount', 'full', 'meta', 'end'] as const).map(place)
+    const shows = (column: Column<T>) => column.card ?? column.cell
+    const sortable = columns.filter((column) => column.sort && onSort && !column.hideHeader)
+    const filterable = columns.filter((column) => column.filter && onFilter && !column.hideHeader)
+    const activeFilters = Object.keys(filters).length
+    const openRow = rowTitle ? shown.find((row) => rowKey(row) === sheet) : undefined
+    // One button instead of a row of chips per sortable and filterable column, which used to push the first row
+    // two or three lines down the screen.
+    const tuner = (sortable.length > 0 || filterable.length > 0) && <div className="dt-mobile-head">
+      <Button size="sm" icon={<SlidersHorizontal size={16} />} onClick={() => setTuning(true)}>
+        Фильтры{activeFilters > 0 && ` · ${activeFilters}`}
+      </Button>
+      {sort && <span className="dt-sort-note">{columns.find((column) => column.key === sort.key)?.header} {sort.dir === 'asc' ? '↑' : '↓'}</span>}
+    </div>
     return wrapped(<>
       {toolbar}
-      {controls.length > 0 && <div className="dt-mobile-head" aria-label="Сортировка и фильтры">
-        {controls.map((column) => <HeaderControl key={column.key} column={column} rows={rows} sort={sort} onSort={column.sort ? onSort : undefined} filters={filters} onFilter={onFilter} />)}
-      </div>}
+      {tuner}
       {shown.length === 0 ? nothing : <div className="dt-cards" role="list" aria-label={label}>
         {ordered.map((row) => {
           const key = rowKey(row)
-          const metaCells = metas.map((column) => ({ column, content: column.cell(row) })).filter(({ content }) => content !== null && content !== false && content !== '')
+          const metaCells = metas.map((column) => ({ column, content: shows(column)(row) })).filter(({ content }) => content !== null && content !== false && content !== '')
+          // Two lines, always in the same places: name and amount, then the details and the one action.
+          const body = <>
+            <div className="dt-card-top">
+              <div className="dt-card-title">{titles.map((column) => <div key={column.key}>{shows(column)(row)}</div>)}</div>
+              {amounts.length > 0 && <div className="dt-card-amount">{amounts.map((column) => <div key={column.key}>{shows(column)(row)}</div>)}</div>}
+            </div>
+            {fulls.map((column) => <div key={column.key} className="dt-card-full">{shows(column)(row)}</div>)}
+            {metaCells.length > 0 && <div className="dt-card-meta">{metaCells.map(({ column, content }) => <span key={column.key}>{column.mobileLabel && <small>{column.header}</small>}{content}</span>)}</div>}
+          </>
           return <div role="listitem" key={key} ref={ref(key)} className={cx('dt-card', rowClassName?.(row), dragging === key && 'is-dragging')}>
             {handle(row)}
-            <div className="dt-card-body">
-              <div className="dt-card-top">
-                <div className="dt-card-title">{titles.map((column) => <div key={column.key}>{column.cell(row)}</div>)}</div>
-                {amounts.length > 0 && <div className="dt-card-amount">{amounts.map((column) => <div key={column.key}>{column.cell(row)}</div>)}</div>}
-              </div>
-              {fulls.map((column) => <div key={column.key} className="dt-card-full">{column.cell(row)}</div>)}
-              {(metaCells.length > 0 || ends.length > 0) && <div className="dt-card-bottom">
-                <div className="dt-card-meta">{metaCells.map(({ column, content }) => <span key={column.key}>{column.mobileLabel && <small>{column.header}</small>}{content}</span>)}</div>
-                {ends.length > 0 && <div className="dt-card-end">{ends.map((column) => <div key={column.key}>{column.cell(row)}</div>)}</div>}
-              </div>}
-            </div>
+            {rowTitle
+              ? <button type="button" className="dt-card-body dt-card-open" aria-label={`Открыть: ${rowTitle(row)}`} onClick={() => setSheet(key)}>{body}</button>
+              : <div className="dt-card-body">{body}</div>}
+            {ends.length > 0 && <div className="dt-card-end">{ends.map((column) => <div key={column.key}>{column.cell(row)}</div>)}</div>}
           </div>
         })}
         {hasFooter && <div className="dt-card dt-card-total">
@@ -280,6 +314,30 @@ export default function DataTable<T>({ rows, columns, rowKey, rowClassName, sear
         </div>}
       </div>}
       {pager}
+      {tuning && <Dialog title="Фильтры" onClose={() => setTuning(false)} actions={<>
+        {filtered && <Button onClick={() => { reset(); setTuning(false) }}>Сбросить</Button>}
+        <Button variant="primary" onClick={() => setTuning(false)}>Готово</Button>
+      </>}>
+        {sortable.length > 0 && <div className="field">
+          <span className="field-label">Сортировка</span>
+          <Select label="Сортировка" value={sort ? `${sort.key}:${sort.dir}` : ''} placeholder="По умолчанию"
+            options={sortable.flatMap((column) => [
+              { value: `${column.key}:asc`, label: `${column.header} ↑` },
+              { value: `${column.key}:desc`, label: `${column.header} ↓` },
+            ])}
+            onChange={(value) => { const [key, dir] = value.split(':'); setSort({ key, dir: dir as Sort['dir'] }); setPage(1) }} />
+        </div>}
+        {filterable.map((column) => <div className="field" key={column.key}>
+          <span className="field-label">{column.header}</span>
+          <FilterBody column={column as Column<T> & { filter: ColumnFilter<T> }} rows={rows} value={filters[column.key]} onChange={(value) => onFilter!(column.key, value)} />
+        </div>)}
+      </Dialog>}
+      {openRow !== undefined && <Dialog title={rowTitle!(openRow)} onClose={() => setSheet(null)} actions={<Button variant="primary" onClick={() => setSheet(null)}>Готово</Button>}>
+        {columns.filter((column, index) => !['end', 'title', 'hidden'].includes(roleOf(column, index))).map((column) => <div className="sheet-row" key={column.key}>
+          <span className="field-label">{column.header}</span>
+          <div>{column.cell(openRow)}</div>
+        </div>)}
+      </Dialog>}
     </>)
   }
 

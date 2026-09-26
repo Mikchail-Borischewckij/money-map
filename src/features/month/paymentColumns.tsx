@@ -35,6 +35,7 @@ export function paymentColumns({ period, readOnly, accountTag, accountName, onCh
     { key: 'when', header: 'Когда', sort: (payment) => isDate(payment.due) ? payment.due : `9${payment.due}`, cell: (payment) => <span className="muted">{whenOf(payment)}</span> },
     { key: 'amount', header: 'Сумма', align: 'right', mobile: 'amount', sort: (payment) => payment.amount,
       footer: (rows) => plainAmount(total(rows.filter((payment) => payment.enabled))),
+      card: (payment) => <strong className="amount">{plainAmount(payment.amount)}</strong>,
       cell: (payment) => {
         if (!weeklyOf(payment)) return <Amount label={`Сумма: ${payment.name}`} value={payment.amount} readOnly={locked(payment)} plain
           onChange={(value) => onChange(payment.id, { amount: value, amountPending: false, checked: false })} />

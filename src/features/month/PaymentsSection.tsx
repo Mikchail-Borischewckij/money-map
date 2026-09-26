@@ -25,7 +25,7 @@ export default function PaymentsSection({ plan, readOnly, update, accountTag, ac
   return <Section step={3} title="Платежи" open={open} onToggle={onToggle} done={done}
     total={planned.length > 0 && `Всего ${money(total(planned))}`} meta={progress(planned.length - unchecked, planned.length)}
     action={!readOnly && unchecked > 1 && <Button size="sm" variant="ghost" onClick={confirmAll}>Проверить все</Button>}>
-    <DataTable label="Платежи" rows={plan.payments} rowKey={(payment) => payment.id} rowClassName={paymentRowClass}
+    <DataTable label="Платежи" rows={plan.payments} rowKey={(payment) => payment.id} rowClassName={paymentRowClass} rowTitle={(payment) => payment.name}
       columns={paymentColumns({ period: periodOfPlan(plan), readOnly, accountTag, accountName, onChange: change, onRemove: remove, onReset })}
       defaultSort={{ key: 'when', dir: 'asc' }}
       search={(payment) => `${payment.name} ${payment.category} ${accountName(payment.accountId)}`}
